@@ -21,6 +21,14 @@ The inspector checks whether current account code begins with the 3-byte designa
 
 This is a current-state observation only. It does not reconstruct the authorization tuple, prove who authorized it, establish intent, inspect the delegated implementation, or identify historical changes. Those require additional evidence and historical data sources.
 
+## Contract bytecode intelligence (release 1)
+
+The browser can disassemble current runtime bytecode and report conservative capability evidence. The disassembler advances over PUSH1–PUSH32 immediate data, so byte values inside PUSH payloads are not misclassified as opcodes.
+
+Current observations include byte length, decoded instruction count, unknown opcode count, selected capability counts (CALL, DELEGATECALL, CALLCODE, STATICCALL, CREATE, CREATE2, SELFDESTRUCT, SSTORE and TSTORE), and PUSH4 selector candidates. Selector candidates are not verified ABI functions.
+
+These are capability indicators, not vulnerability findings. In particular, CALL and SSTORE are common in ordinary contracts; DELEGATECALL and SELFDESTRUCT require contextual review and are not verdicts. The current analysis is limited to runtime bytecode at the latest block, does not decompile code, resolve proxies generally, verify source, or reconstruct historical behavior.
+
 ## Planned modular architecture
 
 Future expansion should keep these domains separated:
