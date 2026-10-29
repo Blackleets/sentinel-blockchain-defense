@@ -1,0 +1,14 @@
+{
+  "name": "sentinel-blockchain-defense",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Read-only Ethereum security inspection and EIP-7702 research workspace",
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check src/eip7702.js && node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
