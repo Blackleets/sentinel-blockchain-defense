@@ -9,7 +9,9 @@ SENTINEL is an evidence-led, read-only Ethereum security research workspace. The
 - Inspect Ethereum Mainnet account addresses using `eth_getCode`, `eth_getBalance`, `eth_getTransactionCount` and `eth_blockNumber`.
 - Inspect transaction hashes using `eth_getTransactionByHash`, `eth_getTransactionReceipt` and block metadata.
 - Detect the EIP-7702 delegated-code designator prefix `0xef0100`, extract the 20-byte delegation target, and inspect whether that target currently has deployed code.
-- Static EVM bytecode disassembly that correctly skips PUSH immediate data.\n- ERC-1967 implementation, admin and beacon slot inspection, including a read-only beacon implementation() lookup when applicable.\n- Contract bytecode analysis follows a resolved ERC-1967 implementation when available.\n- Explainable contract capability evidence for CALL-family operations, CREATE/CREATE2, SELFDESTRUCT, SSTORE and TSTORE.\n- PUSH4 selector candidates, explicitly not treated as verified ABI functions.\n- Unit tests for EIP-7702 parsing, bytecode decoding, capability evidence and exact ETH formatting.
+- Static EVM bytecode disassembly that correctly skips PUSH immediate data.\n- ERC-1967 implementation, admin and beacon slot inspection, including a read-only beacon implementation() lookup when applicable.\n- Contract bytecode analysis follows a resolved ERC-1967 implementation when available.\n- Explainable contract capability evidence for CALL-family operations, CREATE/CREATE2, SELFDESTRUCT, SSTORE and TSTORE.\n- PUSH4 selector candidates, explicitly not treated as verified ABI functions.
+- Bounded recent ERC-1967 event history (`Upgraded`, `AdminChanged`, `BeaconUpgraded`) via read-only `eth_getLogs`, with explicit scanned block range and partial-history caveats.
+- Unit tests for proxy-event decoding and chronological ordering.\n- Unit tests for EIP-7702 parsing, bytecode decoding, capability evidence and exact ETH formatting.
 - GitHub Actions CI runs the Node.js test suite on pushes and pull requests.
 - Show raw observations, network context and query timestamp.
 - Responsive dark security-console interface; no build step or installation required.
@@ -29,7 +31,7 @@ Because the application uses native JavaScript modules, serve the repository ove
 
 ## Scope and limitations
 
-This is an early functional foundation, not a complete smart-contract audit platform. It currently targets Ethereum Mainnet and does not yet provide historical tracing, contract source verification, bytecode decompilation, automated exploit simulation, monitoring, alert delivery or a calibrated risk score. The interface must not be used as the sole basis for financial or security decisions.
+This is an early functional foundation, not a complete smart-contract audit platform. It currently targets Ethereum Mainnet and does not yet provide full historical tracing (the current proxy-event view scans only a bounded recent block window), contract source verification, bytecode decompilation, automated exploit simulation, monitoring, alert delivery or a calibrated risk score. The interface must not be used as the sole basis for financial or security decisions.
 
 ## Roadmap
 
