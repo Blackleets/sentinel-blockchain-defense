@@ -19,6 +19,12 @@ const RULES = [
   ["TSTORE","Transient storage writes are present; inspect transaction-scoped state assumptions."]
 ];
 
+const UPGRADE_SELECTORS = Object.freeze({
+  "0x52d1902d": "proxiableUUID() — ERC-1822 compatibility signal",
+  "0x3659cfe6": "upgradeTo(address) — legacy UUPS upgrade entry-point candidate",
+  "0x4f1ef286": "upgradeToAndCall(address,bytes) — UUPS upgrade entry-point candidate"
+});
+
 function parseCode(code) {
   if (typeof code !== "string" || !/^0x(?:[0-9a-fA-F]{2})*$/.test(code)) {
     throw new TypeError("Expected 0x-prefixed, even-length hexadecimal bytecode");
@@ -63,6 +69,7 @@ export function analyzeBytecode(code) {
     opcodeCounts: counts,
     evidence,
     selectorCandidates: selectors,
+    upgradeSurfaceIndicators: selectors.filter(selector => UPGRADE_SELECTORS[selector]).map(selector => ({ selector, label: UPGRADE_SELECTORS[selector] })),
     unknownOpcodeCount: counts.UNKNOWN || 0,
     truncatedPushCount: instructions.filter(item => item.truncated).length
   };
