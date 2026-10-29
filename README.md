@@ -8,7 +8,7 @@ SENTINEL is an evidence-led, read-only Ethereum security research workspace. The
 
 - Inspect Ethereum Mainnet account addresses using `eth_getCode`, `eth_getBalance`, `eth_getTransactionCount` and `eth_blockNumber`.
 - Inspect transaction hashes using `eth_getTransactionByHash`, `eth_getTransactionReceipt` and block metadata.
-- Detect the EIP-7702 delegated-code designator prefix `0xef0100` and extract the 20-byte delegation target from the current account code.
+- Detect the EIP-7702 delegated-code designator prefix `0xef0100`, extract the 20-byte delegation target, and inspect whether that target currently has deployed code.
 - Unit tests for valid, empty, ordinary, malformed and invalid account-code inputs.
 - GitHub Actions CI runs the Node.js test suite on pushes and pull requests.
 - Show raw observations, network context and query timestamp.
