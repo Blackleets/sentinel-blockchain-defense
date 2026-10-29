@@ -29,6 +29,14 @@ Current observations include byte length, decoded instruction count, unknown opc
 
 These are capability indicators, not vulnerability findings. In particular, CALL and SSTORE are common in ordinary contracts; DELEGATECALL and SELFDESTRUCT require contextual review and are not verdicts. The current analysis is limited to runtime bytecode at the latest block, does not decompile code, resolve proxies generally, verify source, or reconstruct historical behavior.
 
+## ERC-1967 proxy inspection (release 2)
+
+For every inspected address, the client reads the standardized implementation, admin and beacon storage slots defined by ERC-1967. It extracts the low 20 bytes as an address and distinguishes empty slots from malformed values. If the implementation slot is empty and a beacon address is present, it makes a read-only `eth_call` to the beacon's `implementation()` selector (`0x5c60da1b`).
+
+The engine reports the implementation/admin/beacon observations and analyzes the effective implementation bytecode when it can resolve one. A populated admin slot identifies the address stored in that slot; it does not by itself prove what permissions that address has in the implementation or whether every upgrade path is controlled by it. Beacon resolution may fail, and non-ERC-1967 proxy patterns are outside this detector.
+
+Reference: [ERC-1967 specification](https://eips.ethereum.org/EIPS/eip-1967).
+
 ## Planned modular architecture
 
 Future expansion should keep these domains separated:
