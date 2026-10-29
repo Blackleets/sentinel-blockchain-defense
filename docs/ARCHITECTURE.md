@@ -45,6 +45,10 @@ This is a bounded recent window, not a complete lifetime history. ERC-1967 recom
 
 Event definitions and slot semantics: [EIP-1967](https://eips.ethereum.org/EIPS/eip-1967); [OpenZeppelin IERC1967 interface](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/interfaces/IERC1967.sol).
 
+## UUPS / ERC-1822 selector surface (release 4)
+
+The bytecode analyzer now labels three known selector candidates: `proxiableUUID()` (`0x52d1902d`), `upgradeTo(address)` (`0x3659cfe6`) and `upgradeToAndCall(address,bytes)` (`0x4f1ef286`). These are discovered only when the selector bytes occur as PUSH4 immediates in the runtime bytecode. A selector candidate can be unreachable, embedded as data, or used for a different purpose; it is not proof that a function is externally callable, that the contract implements UUPS correctly, or that an upgrade path is exploitable. Confirmation requires control-flow analysis, storage/context validation, and authorization-path review.
+
 ## Planned modular architecture
 
 Future expansion should keep these domains separated:
