@@ -37,6 +37,14 @@ The engine reports the implementation/admin/beacon observations and analyzes the
 
 Reference: [ERC-1967 specification](https://eips.ethereum.org/EIPS/eip-1967).
 
+## ERC-1967 upgrade and control event history (release 3)
+
+When ERC-1967 slots identify a proxy, the browser requests `eth_getLogs` for the proxy address over the most recent 50,000 blocks, filtering the standardized `Upgraded(address)`, `AdminChanged(address,address)` and `BeaconUpgraded(address)` events. Indexed address fields are decoded from topics; non-indexed admin addresses are decoded from event data. Results are sorted by block and log index and show transaction hashes and the exact scanned range.
+
+This is a bounded recent window, not a complete lifetime history. ERC-1967 recommends emitting corresponding events when standardized slots change, but event emission is not guaranteed for every implementation. RPC providers may also limit historical log queries. An empty result therefore does not prove that no upgrade or control change occurred. The event log is evidence of an emitted event, not proof of the complete authorization path or identity of the human decision-maker.
+
+Event definitions and slot semantics: [EIP-1967](https://eips.ethereum.org/EIPS/eip-1967); [OpenZeppelin IERC1967 interface](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/interfaces/IERC1967.sol).
+
 ## Planned modular architecture
 
 Future expansion should keep these domains separated:
