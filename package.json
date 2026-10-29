@@ -6,7 +6,7 @@
   "description": "Read-only Ethereum security inspection and EIP-7702 research workspace",
   "scripts": {
     "test": "node --test",
-    "check": "node --check src/eip7702.js && node --test"
+    "check": "node --check src/eip7702.js && node --check src/bytecode.js && node --test"
   },
   "engines": {
     "node": ">=20"
