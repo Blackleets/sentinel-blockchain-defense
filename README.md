@@ -9,7 +9,7 @@ SENTINEL is an evidence-led, read-only Ethereum security research workspace. The
 - Inspect Ethereum Mainnet account addresses using `eth_getCode`, `eth_getBalance`, `eth_getTransactionCount` and `eth_blockNumber`.
 - Inspect transaction hashes using `eth_getTransactionByHash`, `eth_getTransactionReceipt` and block metadata.
 - Detect the EIP-7702 delegated-code designator prefix `0xef0100`, extract the 20-byte delegation target, and inspect whether that target currently has deployed code.
-- Static EVM bytecode disassembly that correctly skips PUSH immediate data.\n- Explainable contract capability evidence for CALL-family operations, CREATE/CREATE2, SELFDESTRUCT, SSTORE and TSTORE.\n- PUSH4 selector candidates, explicitly not treated as verified ABI functions.\n- Unit tests for EIP-7702 parsing, bytecode decoding, capability evidence and exact ETH formatting.
+- Static EVM bytecode disassembly that correctly skips PUSH immediate data.\n- ERC-1967 implementation, admin and beacon slot inspection, including a read-only beacon implementation() lookup when applicable.\n- Contract bytecode analysis follows a resolved ERC-1967 implementation when available.\n- Explainable contract capability evidence for CALL-family operations, CREATE/CREATE2, SELFDESTRUCT, SSTORE and TSTORE.\n- PUSH4 selector candidates, explicitly not treated as verified ABI functions.\n- Unit tests for EIP-7702 parsing, bytecode decoding, capability evidence and exact ETH formatting.
 - GitHub Actions CI runs the Node.js test suite on pushes and pull requests.
 - Show raw observations, network context and query timestamp.
 - Responsive dark security-console interface; no build step or installation required.
@@ -35,7 +35,7 @@ This is an early functional foundation, not a complete smart-contract audit plat
 
 1. Add configurable RPC providers, chain selection and provider health checks.
 2. Add EIP-7702 history and authorization analysis with clearly sourced evidence.
-3. Expand bytecode intelligence with verified-contract metadata, proxy resolution and historical context.
+3. Expand proxy intelligence beyond ERC-1967 and add verified-contract metadata and historical context.
 4. Add explainable risk indicators with evidence links and confidence boundaries.
 5. Add forensic timelines, exportable case reports and safe local threat simulations.
 6. Add automated tests, CI and deployment hardening.
