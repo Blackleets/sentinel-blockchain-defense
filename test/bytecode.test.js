@@ -34,3 +34,9 @@ test("rejects malformed bytecode", () => {
   assert.throws(() => disassembleBytecode("0x123"), TypeError);
   assert.throws(() => analyzeBytecode("not hex"), TypeError);
 });
+
+test("labels UUPS-related selector candidates without asserting UUPS is confirmed", () => {
+  const result = analyzeBytecode("0x6352d1902d633659cfe6634f1ef286");
+  assert.deepEqual(result.upgradeSurfaceIndicators.map(item => item.selector), ["0x52d1902d", "0x3659cfe6", "0x4f1ef286"]);
+  assert.match(result.upgradeSurfaceIndicators[0].label, /compatibility signal/);
+});
