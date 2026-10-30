@@ -57,6 +57,7 @@ export function buildLiveTransferGraph(transfers, { address, chainId, scannedFro
   const all = transfers.filter(item => item && item.chainId === chainId.toLowerCase()).slice().sort((a,b) =>
     compareHex(a.blockNumber,b.blockNumber) || compareHex(a.logIndex,b.logIndex));
   const reachable = new Set([origin]);
+  const hopDistance = new Map([[origin, 0]]);
   let frontier = new Set([origin]);
   const candidates = new Map();
   for (let depth = 1; depth <= hops && frontier.size; depth++) {
@@ -70,7 +71,7 @@ export function buildLiveTransferGraph(transfers, { address, chainId, scannedFro
       }
       candidates.set(edge.transactionHash + "|" + edge.logIndex, edge);
     }
-    for (const item of next) reachable.add(item);
+    for (const item of next) { reachable.add(item); hopDistance.set(item, depth); }
     frontier = next;
   }
   const ordered = [...candidates.values()].sort((a,b) => compareHex(a.blockNumber,b.blockNumber) ||
@@ -79,7 +80,7 @@ export function buildLiveTransferGraph(transfers, { address, chainId, scannedFro
   const addresses = new Set([origin]);
   for (const edge of edges) { addresses.add(edge.from); addresses.add(edge.to); }
   const nodes = [...addresses].map(addressValue => ({
-    address: addressValue, origin: addressValue === origin,
+    address: addressValue, origin: addressValue === origin, hop: hopDistance.get(addressValue) ?? null,
     incomingCount: edges.filter(edge => edge.to === addressValue).length,
     outgoingCount: edges.filter(edge => edge.from === addressValue).length
   })).sort((a,b) => Number(b.origin)-Number(a.origin) || a.address.localeCompare(b.address));
@@ -165,10 +166,10 @@ async function fetchMetadataBatch(addresses, rpc) {
 }
 const short = value => value.slice(0, 8) + "…" + value.slice(-6);
 const esc = value => String(value).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-function point(index, total, width, height) {
-  if (index === 0) return { x: width/2, y: height/2 };
-  const angle = (index-1) * (Math.PI*2/Math.max(1,total-1)) - Math.PI/2;
-  const radius = Math.min(width,height) * .34;
+function point(index, total, width, height, hop = 1) {
+  if (hop === 0) return { x: width/2, y: height/2 };
+  const angle = index * (Math.PI*2/Math.max(1,total)) - Math.PI/2;
+  const radius = Math.min(width,height) * (hop === 1 ? .27 : .41);
   return { x: width/2 + Math.cos(angle)*radius, y: height/2 + Math.sin(angle)*radius };
 }
 
@@ -213,7 +214,7 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
     selected = address;
     const node = current.nodes.find(item => item.address === address);
     const incoming = current.edges.filter(edge => edge.to === address), outgoing = current.edges.filter(edge => edge.from === address);
-    inspector.innerHTML = '<span class="sl-kicker">NODE INSPECTOR</span><strong>'+esc(address)+'</strong><div class="sl-kv">Role<b>'+(node.origin?'Trace origin':'Observed counterparty')+'</b></div><div class="sl-kv">Incoming Transfer logs<b>'+incoming.length+'</b></div><div class="sl-kv">Outgoing Transfer logs<b>'+outgoing.length+'</b></div><div class="sl-kv">Token contracts observed<b>'+new Set([...incoming,...outgoing].map(edge=>edge.token)).size+'</b></div><a href="'+esc(getNetwork().explorer)+'/address/'+esc(address)+'" target="_blank" rel="noopener noreferrer">Open address in explorer ↗</a>';
+    inspector.innerHTML = '<span class="sl-kicker">NODE INSPECTOR</span><strong>'+esc(address)+'</strong><div class="sl-kv">Role<b>'+(node.origin?'Trace origin':'Observed counterparty')+'</b></div><div class="sl-kv">Hop distance<b>'+(node.hop??'unknown')+'</b></div><div class="sl-kv">Incoming Transfer logs<b>'+incoming.length+'</b></div><div class="sl-kv">Outgoing Transfer logs<b>'+outgoing.length+'</b></div><div class="sl-kv">Token contracts observed<b>'+new Set([...incoming,...outgoing].map(edge=>edge.token)).size+'</b></div><a href="'+esc(getNetwork().explorer)+'/address/'+esc(address)+'" target="_blank" rel="noopener noreferrer">Open address in explorer ↗</a>';
     panel.querySelectorAll(".sl-node").forEach(el => el.classList.toggle("is-selected",el.dataset.address===address));
     renderNodeLedger(address);
   };
@@ -221,10 +222,10 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
     current = graph; selected = graph.origin;
     stats.innerHTML = [
       ['NODES',graph.nodeCount],['OBSERVED TRANSFER LOGS',graph.totalObservedEdges],
-      ['TOKENS',new Set(graph.edges.map(edge=>edge.token)).size],
+      ['TOKENS',new Set(graph.edges.map(edge=>edge.token)).size],['HOPS',graph.hops],
       ['BLOCK WINDOW',graph.scannedFrom+' → '+graph.scannedTo]
     ].map(([label,value])=>'<span class="sl-stat"><b>'+esc(value)+'</b>'+esc(label)+'</span>').join('');
-    const width=760,height=420,positions=new Map(graph.nodes.map((node,index)=>[node.address,point(index,graph.nodes.length,width,height)]));
+    const width=760,height=420,positions=new Map();const rings=new Map();for(const node of graph.nodes){const hop=node.hop??1;if(!rings.has(hop))rings.set(hop,[]);rings.get(hop).push(node);}for(const [hop,nodesInRing] of rings){nodesInRing.forEach((node,index)=>positions.set(node.address,point(index,nodesInRing.length,width,height,hop)));}
     const lines=graph.edges.map(edge=>{const a=positions.get(edge.from),b=positions.get(edge.to);return '<line class="sl-edge" marker-end="url(#sl-arrow)" x1="'+a.x+'" y1="'+a.y+'" x2="'+b.x+'" y2="'+b.y+'"><title>'+esc(edge.token)+' · '+esc(edge.transactionHash)+'</title></line>';}).join('');
     const nodes=graph.nodes.map((node,index)=>{const p=positions.get(node.address),radius=node.origin?13:Math.min(10,6+Math.log2(1+node.incomingCount+node.outgoingCount));return '<g class="sl-node'+(node.origin?' is-selected':'')+'" data-address="'+esc(node.address)+'" data-origin="'+node.origin+'" tabindex="0" role="button" aria-label="Inspect '+esc(node.address)+'"><circle cx="'+p.x+'" cy="'+p.y+'" r="'+radius+'"></circle><text x="'+p.x+'" y="'+(p.y+radius+14)+'">'+esc(short(node.address))+'</text></g>';}).join('');
     canvas.innerHTML='<svg viewBox="0 0 '+width+' '+height+'" role="img" aria-label="Address transfer relationship graph"><defs><marker id="sl-arrow" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#73dce9"></path></marker></defs>'+lines+nodes+'</svg>';
