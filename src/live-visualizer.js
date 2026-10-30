@@ -234,8 +234,8 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
     const view={x:0,y:0,w:width,h:height};
     const applyView=()=>svg.setAttribute("viewBox",[view.x,view.y,view.w,view.h].join(" "));
     const zoom=factor=>{const nextW=Math.max(190,Math.min(width*2,view.w*factor));const nextH=nextW*height/width;view.x+=(view.w-nextW)/2;view.y+=(view.h-nextH)/2;view.w=nextW;view.h=nextH;applyView();};
-    canvas.querySelectorAll("[data-zoom]").forEach(button=>button.addEventListener("click",()=>{const action=button.dataset.zoom;if(action==="reset"){view.x=0;view.y=0;view.w=width;view.h=height;applyView();}else zoom(action==="in"?.82:1.22);}));
-    svg.addEventListener("wheel",event=>{event.preventDefault();zoom(event.deltaY<0?.9:1.1);},{passive:false});
+    canvas.querySelectorAll("[data-zoom]").forEach(button=>button.addEventListener("click",()=>{const action=button.dataset.zoom;if(action==="reset"){view.x=0;view.y=0;view.w=width;view.h=height;applyView();}else zoom(action==="in" ? 0.82 : 1.22);}));
+    svg.addEventListener("wheel",event=>{event.preventDefault();zoom(event.deltaY<0 ? 0.9 : 1.1);},{passive:false});
     let drag=null;
     svg.addEventListener("pointerdown",event=>{if(event.target.closest(".sl-node"))return;drag={x:event.clientX,y:event.clientY};svg.setPointerCapture(event.pointerId);});
     svg.addEventListener("pointermove",event=>{if(!drag)return;const rect=svg.getBoundingClientRect();const dx=(event.clientX-drag.x)*view.w/rect.width;const dy=(event.clientY-drag.y)*view.h/rect.height;view.x-=dx;view.y-=dy;drag={x:event.clientX,y:event.clientY};applyView();});
