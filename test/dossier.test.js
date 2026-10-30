@@ -11,7 +11,8 @@ test("builds a versioned dossier with cases, graph, intelligence and caveats", (
   assert.equal(dossier.schema, "sentinel.investigation-dossier.v1");
   assert.equal(dossier.summary.caseCount, 1);
   assert.equal(dossier.summary.addressNodeCount, 2);
-  assert.equal(dossier.summary.addressProfileCount, 1);\n  assert.equal(dossier.summary.decodedTokenTransferCount, 1);
+  assert.equal(dossier.summary.addressProfileCount, 1);
+  assert.equal(dossier.summary.decodedTokenTransferCount, 1);
   assert.deepEqual(dossier.cases, reports);
   assert.ok(dossier.limitations.length >= 4);
   assert.equal(dossier.assessment.verdict, "not-assessed");
