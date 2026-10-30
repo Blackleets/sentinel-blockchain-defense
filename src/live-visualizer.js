@@ -1,3 +1,4 @@
+import { fetchBlockscoutAddressTransfers, BLOCKSCOUT_ENDPOINTS } from "./blockscout-provider.js";
 const ADDRESS = /^0x[0-9a-f]{40}$/i;
 const HASH = /^0x[0-9a-f]{64}$/i;
 export const ERC20_TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
@@ -179,7 +180,7 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
   panel.className = "sentinel-live";
   panel.innerHTML = `
     <div class="sl-head"><div><div class="sl-kicker">SENTINEL / LIVE VISUALIZER</div><h2>Address relationship map</h2><p>Explore on-chain Transfer events around an address. Every edge links to its source transaction.</p></div><span class="sl-readonly">● READ ONLY</span></div>
-    <form class="sl-controls"><input name="address" spellcheck="false" autocomplete="off" placeholder="Paste an EVM wallet or contract address" aria-label="Address to trace" required><label>Block window <select name="window"><option value="500">500</option><option value="2000" selected>2,000</option><option value="5000">5,000</option><option value="10000">10,000</option></select></label><label>Graph depth <select name="hops"><option value="1" selected>1 hop</option><option value="2">2 hops</option></select></label><button type="submit">Trace address ↗</button></form>
+    <form class="sl-controls"><input name="address" spellcheck="false" autocomplete="off" placeholder="Paste an EVM wallet or contract address" aria-label="Address to trace" required><label>History source <select name="source"><option value="rpc" selected>Live RPC · recent blocks</option><option value="indexed">Indexed history · Ethereum</option></select></label><label>Block window <select name="window"><option value="500">500</option><option value="2000" selected>2,000</option><option value="5000">5,000</option><option value="10000">10,000</option></select></label><label>Graph depth <select name="hops"><option value="1" selected>1 hop</option><option value="2">2 hops</option></select></label><button type="submit">Trace address ↗</button></form>
     <div class="sl-meta" data-role="status">Choose an address to build a live relationship map from recent ERC-20 Transfer logs.</div>
     <div class="sl-stats" data-role="stats"></div>
     <div class="sl-layout"><div class="sl-canvas" data-role="canvas"><div class="sl-empty">Your graph will appear here</div></div><aside class="sl-inspector" data-role="inspector"><span class="sl-kicker">NODE INSPECTOR</span><strong>Select a node</strong><p>Address details and observed transfer evidence will appear here.</p></aside></div>
@@ -245,53 +246,74 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
     if(graph.truncated)status.textContent+=' · Display capped at '+graph.edgeCount+' edges; '+graph.totalObservedEdges+' matched.';
     showNode(graph.origin);
   };
+  form.elements.source.addEventListener("change",()=>{
+    const indexed=form.elements.source.value==="indexed";
+    form.elements.window.disabled=indexed;
+    form.elements.hops.disabled=indexed;
+    if(indexed)form.elements.hops.value="1";
+  });
   form.addEventListener("submit",async event=>{
     event.preventDefault();const address=normalizeAddress(form.elements.address.value.trim());
     if(!address){status.textContent="Enter a valid 20-byte EVM address.";status.classList.add("sl-error");return;}
-    const network=getNetwork();status.classList.remove("sl-error");form.querySelector("button").disabled=true;form.querySelector("button").textContent="Tracing…";
-    canvas.innerHTML='<div class="sl-empty">Querying live RPC Transfer logs…</div>';ledger.replaceChildren();stats.replaceChildren();
+    const network=getNetwork(),source=form.elements.source.value;
+    status.classList.remove("sl-error");form.querySelector("button").disabled=true;form.querySelector("button").textContent="Tracing…";
+    canvas.innerHTML='<div class="sl-empty">Querying '+(source==="indexed"?"indexed address history":"live RPC Transfer logs")+'…</div>';ledger.replaceChildren();stats.replaceChildren();
     try{
-      const chainId=await rpc("eth_chainId",[]);
-      if(chainId.toLowerCase()!==network.chainId.toLowerCase())throw new Error("RPC chain ID mismatch; no graph data accepted.");
-      const latestHex=await rpc("eth_blockNumber",[]),latest=BigInt(latestHex),requested=Number(form.elements.window.value);
-      let windowBlocks=requested,logs=[],lastError=null;
-      for(let attempt=0;attempt<4;attempt++){
-        const from=latest>BigInt(windowBlocks)?latest-BigInt(windowBlocks):0n,fromHex="0x"+from.toString(16);
-        try{
-          const [sent,received]=await Promise.all([
-            rpc("eth_getLogs",[{fromBlock:fromHex,toBlock:latestHex,topics:[ERC20_TRANSFER_TOPIC,addressTopic(address)]}]),
-            rpc("eth_getLogs",[{fromBlock:fromHex,toBlock:latestHex,topics:[ERC20_TRANSFER_TOPIC,null,addressTopic(address)]}])
-          ]);
-          logs=[...(sent||[]),...(received||[])];lastError=null;break;
-        }catch(error){lastError=error;if(attempt===3||windowBlocks<=64)break;windowBlocks=Math.max(64,Math.floor(windowBlocks/2));}
-      }
-      if(lastError)throw new Error("RPC could not scan the requested window: "+lastError.message);
-      const requestedHops = Number(form.elements.hops.value);
-      const from=latest>BigInt(windowBlocks)?latest-BigInt(windowBlocks):0n;
-      let allLogs = logs.slice(), expansionFailures = 0, expandedAddresses = 0, expansionCandidates = 0;
-      const rootTransfers = decodeTransferLogs(logs,{chainId:network.chainId});
-      if (requestedHops === 2) {
-        const allPeers = [...new Set(rootTransfers.map(edge => edge.from === address ? edge.to : edge.from).filter(peer => peer !== address))];
-        expansionCandidates = allPeers.length;
-        const peers = allPeers.slice(0,8);
-        const expanded = await Promise.allSettled(peers.map(async peer => {
-          const [sent,received] = await Promise.all([
-            rpc("eth_getLogs",[{fromBlock:"0x"+from.toString(16),toBlock:latestHex,topics:[ERC20_TRANSFER_TOPIC,addressTopic(peer)]}]),
-            rpc("eth_getLogs",[{fromBlock:"0x"+from.toString(16),toBlock:latestHex,topics:[ERC20_TRANSFER_TOPIC,null,addressTopic(peer)]}])
-          ]);
-          return [...(sent||[]),...(received||[])];
-        }));
-        for (const result of expanded) {
-          if (result.status === "fulfilled") { allLogs.push(...result.value); expandedAddresses++; }
-          else expansionFailures++;
+      let graph;
+      if(source==="indexed"){
+        if(!BLOCKSCOUT_ENDPOINTS[String(network.chainId).toLowerCase()])throw new Error("Indexed history is not configured for "+network.name+". Select Ethereum Mainnet or switch to Live RPC.");
+        const history=await fetchBlockscoutAddressTransfers({address,chainId:network.chainId,maxPages:8});
+        graph=buildLiveTransferGraph(history.transfers,{address,chainId:network.chainId,scannedFrom:history.blockRange?.from??"n/a",scannedTo:history.blockRange?.to??"n/a",hops:1,maxEdges:160,maxNodes:40});
+        graph.coverage="indexed-erc20-address-history";
+        graph.provider=history.provider;
+        graph.history={pagesFetched:history.pagesFetched,itemCount:history.itemCount,complete:history.complete,truncated:history.truncated,malformedItems:history.malformedItems,directionCoverage:history.directionCoverage,limitations:history.limitations};
+        tokenMetadata=new Map(Object.entries(history.tokenMetadata));
+        render(graph);
+        status.textContent="Ethereum Mainnet · Blockscout indexed history · "+history.itemCount.toLocaleString()+" ERC-20 records · "+history.pagesFetched+" pages · "+(history.complete?"provider pagination complete":"partial history; page cap reached")+(history.malformedItems?" · "+history.malformedItems+" malformed records skipped":"")+" · "+new Date().toISOString();
+      }else{
+        const chainId=await rpc("eth_chainId",[]);
+        if(chainId.toLowerCase()!==network.chainId.toLowerCase())throw new Error("RPC chain ID mismatch; no graph data accepted.");
+        const latestHex=await rpc("eth_blockNumber",[]),latest=BigInt(latestHex),requested=Number(form.elements.window.value);
+        let windowBlocks=requested,logs=[],lastError=null;
+        for(let attempt=0;attempt<4;attempt++){
+          const from=latest>BigInt(windowBlocks)?latest-BigInt(windowBlocks):0n,fromHex="0x"+from.toString(16);
+          try{
+            const [sent,received]=await Promise.all([
+              rpc("eth_getLogs",[{fromBlock:fromHex,toBlock:latestHex,topics:[ERC20_TRANSFER_TOPIC,addressTopic(address)]}]),
+              rpc("eth_getLogs",[{fromBlock:fromHex,toBlock:latestHex,topics:[ERC20_TRANSFER_TOPIC,null,addressTopic(address)]}])
+            ]);
+            logs=[...(sent||[]),...(received||[])];lastError=null;break;
+          }catch(error){lastError=error;if(attempt===3||windowBlocks<=64)break;windowBlocks=Math.max(64,Math.floor(windowBlocks/2));}
         }
+        if(lastError)throw new Error("RPC could not scan the requested window: "+lastError.message);
+        const requestedHops = Number(form.elements.hops.value);
+        const from=latest>BigInt(windowBlocks)?latest-BigInt(windowBlocks):0n;
+        let allLogs = logs.slice(), expansionFailures = 0, expandedAddresses = 0, expansionCandidates = 0;
+        const rootTransfers = decodeTransferLogs(logs,{chainId:network.chainId});
+        if (requestedHops === 2) {
+          const allPeers = [...new Set(rootTransfers.map(edge => edge.from === address ? edge.to : edge.from).filter(peer => peer !== address))];
+          expansionCandidates = allPeers.length;
+          const peers = allPeers.slice(0,8);
+          const expanded = await Promise.allSettled(peers.map(async peer => {
+            const [sent,received] = await Promise.all([
+              rpc("eth_getLogs",[{fromBlock:"0x"+from.toString(16),toBlock:latestHex,topics:[ERC20_TRANSFER_TOPIC,addressTopic(peer)]}]),
+              rpc("eth_getLogs",[{fromBlock:"0x"+from.toString(16),toBlock:latestHex,topics:[ERC20_TRANSFER_TOPIC,null,addressTopic(peer)]}])
+            ]);
+            return [...(sent||[]),...(received||[])];
+          }));
+          for (const result of expanded) {
+            if (result.status === "fulfilled") { allLogs.push(...result.value); expandedAddresses++; }
+            else expansionFailures++;
+          }
+        }
+        const transfers=decodeTransferLogs(allLogs,{chainId:network.chainId});
+        graph=buildLiveTransferGraph(transfers,{address,chainId:network.chainId,scannedFrom:from.toString(),scannedTo:latest.toString(),hops:requestedHops,maxEdges:160,maxNodes:40});
+        graph.provider="Selected public RPC endpoint";
+        tokenMetadata = await fetchMetadataBatch(graph.edges.map(edge => edge.token), rpc);
+        render(graph);
+        status.textContent=network.name+" · "+requestedHops+" hop(s) · scanned "+windowBlocks.toLocaleString()+" blocks"+(requestedHops===2?" · expanded "+expandedAddresses+"/"+Math.min(expansionCandidates,8)+" counterparties"+(expansionCandidates>8?" (8-counterparty cap)":""):"")+(expansionFailures?" · "+expansionFailures+" expansion queries failed":"")+(graph.truncated?" · graph reached its node/edge cap":"")+" · "+new Date().toISOString();
       }
-      const transfers=decodeTransferLogs(allLogs,{chainId:network.chainId});
-      const graph=buildLiveTransferGraph(transfers,{address,chainId:network.chainId,scannedFrom:from.toString(),scannedTo:latest.toString(),hops:requestedHops,maxEdges:160,maxNodes:40});
-      tokenMetadata = await fetchMetadataBatch(graph.edges.map(edge => edge.token), rpc);
-      render(graph);
-      status.textContent=network.name+" · "+requestedHops+" hop(s) · scanned "+windowBlocks.toLocaleString()+" blocks"+(requestedHops===2?" · expanded "+expandedAddresses+"/"+Math.min(expansionCandidates,8)+" counterparties"+(expansionCandidates>8?" (8-counterparty cap)":""):"")+(expansionFailures?" · "+expansionFailures+" expansion queries failed":"")+(graph.truncated?" · graph reached its node/edge cap":"")+" · "+new Date().toISOString();
-    }catch(error){canvas.innerHTML='<div class="sl-empty sl-error">'+esc(error.message)+'</div>';status.textContent="Live trace failed. The provider may limit eth_getLogs range or availability.";status.classList.add("sl-error");}
+    }catch(error){canvas.innerHTML='<div class="sl-empty sl-error">'+esc(error.message)+'</div>';status.textContent="Live trace failed. Check provider availability, chain support and pagination limits.";status.classList.add("sl-error");}
     finally{form.querySelector("button").disabled=false;form.querySelector("button").textContent="Trace address ↗";}
   });
   return {panel,trace:()=>form.requestSubmit(),get result(){return current;}};
