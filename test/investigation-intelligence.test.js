@@ -33,7 +33,9 @@ test("sorts known block numbers numerically and keeps unknown blocks last",()=>{
   {id:"unknown",chainId:"0x1",type:"observed-transaction-flow",from:address,to:other,source:"correlation-graph",evidence:[{}]}
  ]}};
  const result=buildInvestigationIntelligence(data);
- const blocks=result.timeline.map(item=>item.blockNumber);\n assert.deepEqual(blocks.filter(value=>value!==null),["0x2","0x10","0x100"]);\n assert.ok(blocks.slice(-2).every(value=>value===null));
+ const blocks=result.timeline.map(item=>item.blockNumber);
+ assert.deepEqual(blocks.filter(value=>value!==null),["0x2","0x10","0x100"]);
+ assert.ok(blocks.slice(-2).every(value=>value===null));
 });
 test("rejects mismatched subjects and invalid source artifacts",()=>{
  assert.throws(()=>buildInvestigationIntelligence({...inputs,playbook:{...playbook,subject:{chainId:"0x89",address}}}),/does not match/);
