@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildTokenFlowGraph } from "../src/token-flow.js";
+import { buildTokenFlowGraph, findObservedTokenPaths } from "../src/token-flow.js";
 
 const a = "0x1111111111111111111111111111111111111111";
 const b = "0x2222222222222222222222222222222222222222";
@@ -66,4 +66,43 @@ test("rejects invalid arguments and ignores malformed evidence", () => {
   assert.throws(() => buildTokenFlowGraph([], { address: "not-an-address" }), /valid EVM address/);
   const result = buildTokenFlowGraph([{ ...transfer(a, b, "0x10", "0x0", "a"), amountRaw: "-1" }]);
   assert.equal(result.edgeCount, 0);
+});
+
+test("finds bounded directed paths only within the same chain and token", () => {
+  const graph = buildTokenFlowGraph([
+    transfer(a, b, "0x10", "0x0", "a"),
+    transfer(b, c, "0x11", "0x0", "b"),
+    transfer(a, c, "0x12", "0x0", "c", { chainId: "0x38" }),
+    transfer(b, c, "0x13", "0x1", "d", { token: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" })
+  ]);
+  const result = findObservedTokenPaths(graph, { from: a, to: c, maxHops: 3 });
+  assert.equal(result.pathCount, 1);
+  assert.equal(result.paths[0].hopCount, 2);
+  assert.deepEqual(result.paths[0].addresses, [a, b, c]);
+  assert.equal(result.paths[0].edges[0].transactionHash, tx("a"));
+  assert.match(result.limitation, /does not prove/);
+});
+
+test("does not invent reverse paths or revisit addresses in cycles", () => {
+  const graph = buildTokenFlowGraph([
+    transfer(a, b, "0x10", "0x0", "a"),
+    transfer(b, a, "0x11", "0x0", "b"),
+    transfer(b, c, "0x12", "0x0", "c")
+  ]);
+  assert.equal(findObservedTokenPaths(graph, { from: c, to: a }).pathCount, 0);
+  const result = findObservedTokenPaths(graph, { from: a, to: c, maxHops: 3 });
+  assert.equal(result.pathCount, 1);
+  assert.deepEqual(result.paths[0].addresses, [a, b, c]);
+});
+
+test("enforces hop and path bounds and handles identical endpoints", () => {
+  const graph = buildTokenFlowGraph([
+    transfer(a, b, "0x10", "0x0", "a"),
+    transfer(a, c, "0x10", "0x1", "b"),
+    transfer(b, c, "0x11", "0x0", "c")
+  ]);
+  assert.equal(findObservedTokenPaths(graph, { from: a, to: c, maxHops: 1 }).pathCount, 1);
+  assert.throws(() => findObservedTokenPaths(graph, { from: a, to: c, maxHops: 6 }), /between 1 and 5/);
+  assert.equal(findObservedTokenPaths(graph, { from: a, to: a }).pathCount, 0);
+  assert.throws(() => findObservedTokenPaths(graph, { from: a, to: c, maxPaths: 0 }), /between 1 and 50/);
 });
