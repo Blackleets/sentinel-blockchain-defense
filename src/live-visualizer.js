@@ -221,6 +221,8 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
   };
   const render = graph => {
     current = graph; selected = graph.origin;
+    const coverageNote=panel.querySelector(".sl-foot");
+    if(coverageNote)coverageNote.textContent=graph.coverage==="indexed-erc20-address-history"?"Coverage: Blockscout indexed Ethereum ERC-20 transfer records · pagination status shown above · one-hop graph · provider index may be incomplete":"Coverage: bounded RPC window · ERC-20 Transfer-shaped logs only · single-provider observation · no attribution or risk verdict";
     stats.innerHTML = [
       ['NODES',graph.nodeCount],['OBSERVED TRANSFER LOGS',graph.totalObservedEdges],
       ['TOKENS',new Set(graph.edges.map(edge=>edge.token)).size],['HOPS',graph.hops],
@@ -267,6 +269,8 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
         graph.coverage="indexed-erc20-address-history";
         graph.provider=history.provider;
         graph.history={pagesFetched:history.pagesFetched,itemCount:history.itemCount,complete:history.complete,truncated:history.truncated,malformedItems:history.malformedItems,directionCoverage:history.directionCoverage,limitations:history.limitations};
+        graph.truncated=graph.truncated||history.truncated;
+        graph.limitations=history.limitations;
         tokenMetadata=new Map(Object.entries(history.tokenMetadata));
         render(graph);
         status.textContent="Ethereum Mainnet · Blockscout indexed history · "+history.itemCount.toLocaleString()+" ERC-20 records · "+history.pagesFetched+" pages · "+(history.complete?"provider pagination complete":"partial history; page cap reached")+(history.malformedItems?" · "+history.malformedItems+" malformed records skipped":"")+" · "+new Date().toISOString();
