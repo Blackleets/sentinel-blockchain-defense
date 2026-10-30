@@ -90,3 +90,80 @@ export function buildTokenFlowGraph(transfers, options = {}) {
     ]
   };
 }
+
+
+export function findObservedTokenPaths(graph, options = {}) {
+  if (!graph || graph.schema !== "sentinel.token-flow-graph.v1" || !Array.isArray(graph.edges)) {
+    throw new TypeError("A SENTINEL token flow graph is required");
+  }
+  const { from, to, maxHops = 3, maxPaths = 20 } = options;
+  const start = normalizeAddress(from), target = normalizeAddress(to);
+  if (!start || !target) throw new TypeError("Both path endpoints must be valid EVM addresses");
+  if (!Number.isInteger(maxHops) || maxHops < 1 || maxHops > 5) throw new RangeError("maxHops must be between 1 and 5");
+  if (!Number.isInteger(maxPaths) || maxPaths < 1 || maxPaths > 50) throw new RangeError("maxPaths must be between 1 and 50");
+  if (start === target) return { schema: "sentinel.observed-token-paths.v1", from: start, to: target, maxHops, pathCount: 0, truncated: false, paths: [], interpretation: "no-hop-path-requested" };
+  const adjacency = new Map();
+  for (const edge of graph.edges) {
+    if (!edge || !normalizeAddress(edge.from) || !normalizeAddress(edge.to) || !normalizeAddress(edge.token)) continue;
+    const key = edge.chainId + "|" + edge.token;
+    if (!adjacency.has(key)) adjacency.set(key, new Map());
+    const byAddress = adjacency.get(key);
+    const source = normalizeAddress(edge.from);
+    if (!byAddress.has(source)) byAddress.set(source, []);
+    byAddress.get(source).push(edge);
+  }
+  for (const byAddress of adjacency.values()) for (const list of byAddress.values()) {
+    list.sort((a,b) => compareHex(a.blockNumber,b.blockNumber) || compareHex(a.logIndex,b.logIndex) || a.transactionHash.localeCompare(b.transactionHash));
+  }
+  const results = [];
+  let truncated = false;
+  const keys = [...adjacency.keys()].sort();
+  for (const key of keys) {
+    const byAddress = adjacency.get(key);
+    const visit = (current, visited, pathEdges) => {
+      if (results.length >= maxPaths) { truncated = true; return; }
+      if (pathEdges.length >= maxHops) return;
+      for (const edge of byAddress.get(current) || []) {
+        const next = normalizeAddress(edge.to);
+        if (visited.has(next)) continue;
+        const nextEdges = [...pathEdges, edge];
+        if (next === target) {
+          results.push({
+            chainId: edge.chainId,
+            token: edge.token,
+            hopCount: nextEdges.length,
+            addresses: [start, ...nextEdges.map(item => item.to)],
+            edges: nextEdges.map(item => ({
+              transactionHash: item.transactionHash,
+              logIndex: item.logIndex,
+              blockNumber: item.blockNumber,
+              from: item.from,
+              to: item.to,
+              amountRaw: item.amountRaw,
+              caseSubject: item.caseSubject || null
+            }))
+          });
+          if (results.length >= maxPaths) { truncated = true; return; }
+        } else {
+          const nextVisited = new Set(visited);
+          nextVisited.add(next);
+          visit(next, nextVisited, nextEdges);
+        }
+      }
+    };
+    visit(start, new Set([start]), []);
+    if (truncated) break;
+  }
+  results.sort((a,b) => a.hopCount-b.hopCount || a.chainId.localeCompare(b.chainId) || a.token.localeCompare(b.token) || a.edges.map(e=>e.transactionHash+e.logIndex).join("|").localeCompare(b.edges.map(e=>e.transactionHash+e.logIndex).join("|")));
+  return {
+    schema: "sentinel.observed-token-paths.v1",
+    from: start,
+    to: target,
+    maxHops,
+    pathCount: results.length,
+    truncated,
+    paths: results,
+    interpretation: "observed-directed-event-sequences-only",
+    limitation: "A path is a sequence of observed Transfer-shaped logs for one chain and token contract. It does not prove that funds were forwarded, that the same assets moved between events, or that addresses share an owner."
+  };
+}
