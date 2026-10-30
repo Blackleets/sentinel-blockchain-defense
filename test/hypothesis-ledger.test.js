@@ -62,7 +62,7 @@ test("reports competing histories without overwriting the local assessment",()=>
  assert.equal(result.ledger.entries[0].assessments[0].note,"Local review.");
 });
 test("rejects cross-subject, malformed and non-sequential imported histories",()=>{
- const local=reconcileHypothesisLedger(base());
+ const local=reconcileHypothesisLedger(base);
  assert.throws(()=>mergeHypothesisLedgers({current:local,imported:local,subject:otherSubject}),/different chain or subject/);
  const malformed=reviewed("supported","Checked.","case-1","2026-10-30T11:05:00.000Z");
  malformed.entries[0].assessments[0].revision=4;
