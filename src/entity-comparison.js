@@ -40,6 +40,8 @@ export function compareObservedEntities({graph,threatIntelligence,chainId,addres
  const aCounterparties=new Set(counterparties(aEvidence)),bCounterparties=new Set(counterparties(bEvidence));
  const sharedCounterparties=[...aCounterparties].filter(value=>bCounterparties.has(value)).sort();
  const directEdges=edges.filter(edge=>(normalize(edge.from)===a&&normalize(edge.to)===b)||(normalize(edge.from)===b&&normalize(edge.to)===a));
+ const directReceiptLogs=transfers.filter(item=>(normalize(item.from)===a&&normalize(item.to)===b)||(normalize(item.from)===b&&normalize(item.to)===a));
+ const directHandoffLinks=handoffs.filter(item=>{const sequence=[item.from,item.via,item.to].map(normalize);return sequence.some((value,index)=>value===a&&sequence[index+1]===b)||sequence.some((value,index)=>value===b&&sequence[index+1]===a);});
  const transactionMap=(items,address)=>{const map=new Map();for(const item of items){const participants=[item.from,item.to,item.via].map(normalize);if(!participants.includes(address))continue;const tx=hash(item.transactionHash||item.txHash);if(!tx)continue;if(!map.has(tx))map.set(tx,[]);map.get(tx).push(item);}return map;};
  const txA=transactionMap([...transfers,...handoffs],a),txB=transactionMap([...transfers,...handoffs],b);
  const sharedTransactionHashes=[...txA.keys()].filter(value=>txB.has(value)).sort();
@@ -66,8 +68,12 @@ export function compareObservedEntities({graph,threatIntelligence,chainId,addres
   generatedAt:new Date().toISOString(),
   chainId:chain,
   entities:{a,b},
-  summary:{directRelationshipCount:directEdges.length,sharedCounterpartyCount:sharedCounterparties.length,sharedTransactionHashCount:sharedTransactionHashes.length,sharedCaseSubjectCount:sharedCaseSubjects.length,sharedInfrastructureCount:sharedInfrastructure.length},
-  directRelationships:directEdges.map(edge=>({type:edge.type,from:normalize(edge.from),to:normalize(edge.to),source:"correlation-graph",evidence:edge.evidence||[]})),
+  summary:{directRelationshipCount:directEdges.length+directReceiptLogs.length+directHandoffLinks.length,sharedCounterpartyCount:sharedCounterparties.length,sharedTransactionHashCount:sharedTransactionHashes.length,sharedCaseSubjectCount:sharedCaseSubjects.length,sharedInfrastructureCount:sharedInfrastructure.length},
+  directRelationships:[
+   ...directEdges.map(edge=>({type:edge.type,from:normalize(edge.from),to:normalize(edge.to),source:"correlation-graph",evidence:edge.evidence||[]})),
+   ...directReceiptLogs.map(item=>({type:"observed-token-transfer-log",from:normalize(item.from),to:normalize(item.to),source:"imported-receipt-log",transactionHash:item.transactionHash||item.txHash||null,blockNumber:item.blockNumber??null,logIndex:item.logIndex??null,amountRaw:item.amountRaw??null,token:item.token||null,caseSubject:item.caseSubject||null})),
+   ...directHandoffLinks.map(item=>({type:"transaction-handoff",from:normalize(item.from),via:normalize(item.via),to:normalize(item.to),source:"imported-transaction-handoff",transactionHashes:item.transactionHashes||item.hashes||[]}))
+  ],
   sharedCounterparties:sharedCounterparties.map(address=>({address,observedForA:aEvidence.filter(item=>item.counterparty===address).map(item=>item.kind),observedForB:bEvidence.filter(item=>item.counterparty===address).map(item=>item.kind)})),
   sharedTransactionHashes:sharedTransactionHashes.map(transactionHash=>({transactionHash,recordsA:txA.get(transactionHash),recordsB:txB.get(transactionHash)})),
   sharedCaseSubjects,
