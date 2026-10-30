@@ -75,6 +75,70 @@ export function buildLiveTransferGraph(transfers, { address, chainId, scannedFro
   };
 }
 
+export function formatTokenAmount(rawAmount, decimals) {
+  if (typeof rawAmount !== "string" || !/^\d+$/.test(rawAmount)) return "Unknown amount";
+  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 36) return rawAmount + " (raw units)";
+  const value = BigInt(rawAmount), divisor = 10n ** BigInt(decimals);
+  const whole = value / divisor;
+  if (decimals === 0) return whole.toString();
+  const fraction = (value % divisor).toString().padStart(decimals, "0").replace(/0+$/, "");
+  return fraction ? whole.toString() + "." + fraction : whole.toString();
+}
+
+export function decodeAbiString(value) {
+  if (typeof value !== "string" || !/^0x[0-9a-f]*$/i.test(value) || value.length < 66) return null;
+  const data = value.slice(2);
+  try {
+    const offset = Number(BigInt("0x" + data.slice(0, 64))) * 2;
+    if (Number.isSafeInteger(offset) && offset >= 0 && offset + 64 <= data.length) {
+      const length = Number(BigInt("0x" + data.slice(offset, offset + 64)));
+      if (Number.isSafeInteger(length) && length >= 0 && length <= 256 && offset + 64 + length * 2 <= data.length) {
+        const bytes = new Uint8Array(length);
+        for (let i = 0; i < length; i++) bytes[i] = parseInt(data.slice(offset + 64 + i * 2, offset + 66 + i * 2), 16);
+        const decoded = new TextDecoder().decode(bytes).replace(/\u0000+$/g, "").trim();
+        if (decoded) return decoded;
+      }
+    }
+    if (data.length === 64) {
+      const bytes = new Uint8Array(32);
+      for (let i = 0; i < 32; i++) bytes[i] = parseInt(data.slice(i * 2, i * 2 + 2), 16);
+      const decoded = new TextDecoder().decode(bytes).replace(/\u0000+$/g, "").trim();
+      return decoded || null;
+    }
+  } catch {}
+  return null;
+}
+
+export function decodeTokenMetadata({ symbolResult, nameResult, decimalsResult } = {}) {
+  let decimals = null;
+  if (typeof decimalsResult === "string" && /^0x[0-9a-f]{64}$/i.test(decimalsResult)) {
+    const parsed = Number(BigInt(decimalsResult));
+    if (Number.isInteger(parsed) && parsed >= 0 && parsed <= 36) decimals = parsed;
+  }
+  return { symbol: decodeAbiString(symbolResult), name: decodeAbiString(nameResult), decimals };
+}
+
+async function fetchTokenMetadata(address, rpc) {
+  const call = selector => rpc("eth_call", [{ to: address, data: selector }, "latest"]);
+  const [symbolResult, nameResult, decimalsResult] = await Promise.all([
+    call("0x95d89b41").catch(() => null),
+    call("0x06fdde03").catch(() => null),
+    call("0x313ce567").catch(() => null)
+  ]);
+  return decodeTokenMetadata({ symbolResult, nameResult, decimalsResult });
+}
+
+async function fetchMetadataBatch(addresses, rpc) {
+  const metadata = new Map(), unique = [...new Set(addresses)].slice(0, 24);
+  for (let i = 0; i < unique.length; i += 6) {
+    const batch = await Promise.all(unique.slice(i, i + 6).map(async address => {
+      try { return [address, await fetchTokenMetadata(address, rpc)]; }
+      catch { return [address, { symbol: null, name: null, decimals: null }]; }
+    }));
+    for (const [address, value] of batch) metadata.set(address, value);
+  }
+  return metadata;
+}
 const short = value => value.slice(0, 8) + "…" + value.slice(-6);
 const esc = value => String(value).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function point(index, total, width, height) {
