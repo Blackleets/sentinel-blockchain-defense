@@ -19,3 +19,18 @@ test("expands every shared-infrastructure address recorded across edge evidence"
  assert.equal(result.edges.filter(edge=>edge.source==="shared-infrastructure").length,2);
  assert.ok(result.edges.every(edge=>edge.evidence.some(item=>item.sharedAddress===sharedA||item.sharedAddress===sharedB)));
 });
+
+test("bounds relationship edges independently from node traversal",()=>{
+ const dense={schema:"sentinel.correlation-graph.v1",edges:[
+  {chainId:"0x1",type:"observed-transaction-flow",from:a,to:b,evidence:[]},
+  {chainId:"0x1",type:"observed-transaction-flow",from:a,to:c,evidence:[]},
+  {chainId:"0x1",type:"observed-transaction-flow",from:b,to:c,evidence:[]}
+ ]};
+ const r=buildEntityNeighborhood({graph:dense,threatIntelligence:{schema:"sentinel.threat-intelligence.v1",tokenTransfers:[],transactionLinks:[]},chainId:"0x1",address:a,maxDepth:2,maxEdges:1});
+ assert.equal(r.summary.edgeCount,1);
+ assert.equal(r.summary.matchedEdgeCount,3);
+ assert.equal(r.summary.truncatedEdges,true);
+ assert.equal(r.summary.truncated,true);
+ assert.equal(r.summary.nodeCount,3);
+ assert.throws(()=>buildEntityNeighborhood({graph:dense,threatIntelligence:{schema:"sentinel.threat-intelligence.v1"},chainId:"0x1",address:a,maxEdges:2001}),/between 1 and 2000/);
+});
