@@ -42,7 +42,7 @@ function normalizeNativeTransaction(item, chainId) {
   if (!from || !to || typeof value !== "string" || !/^\d+$/.test(value) || value === "0" || !blockNumber || !position) return null;
   return {
     chainId, token: "NATIVE:ETH", from, to, amountRaw: value,
-    transactionHash: item.hash.toLowerCase(), blockNumber, logIndex: position,
+    transactionHash: item.hash.toLowerCase(), blockNumber, logIndex: "0x" + (BigInt(position) + 0x200000000n).toString(16),
     timestamp: typeof item.timestamp === "string" ? item.timestamp : null,
     tokenMetadata: { symbol: "ETH", name: "Ether", decimals: 18 },
     transferType: "native",
