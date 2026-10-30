@@ -52,3 +52,10 @@ test("lists addresses across graph, transaction and token evidence",()=>{
  assert.ok(list.some(item=>item.chainId==="0x1"&&item.address===a));
  assert.ok(list.some(item=>item.chainId==="0x1"&&item.address===b));
 });
+
+test("ignores malformed token case subjects without breaking an address investigation",()=>{
+ const malformedThreat={...threat,tokenTransfers:[{chainId:"0x1",from:a,to:b,amountRaw:"1",blockNumber:"0x12",logIndex:"0x0",caseSubject:42}]};
+ const result=buildAddressInvestigation({reports:[],graph,threatIntelligence:malformedThreat,chainId:"0x1",address:a});
+ assert.equal(result.summary.tokenTransferCount,1);
+ assert.deepEqual(result.caseSubjects,[]);
+});
