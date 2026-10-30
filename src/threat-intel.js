@@ -38,6 +38,23 @@ function addGroupedSignal(signals, { id, rule, chainId, address, cases, evidence
   });
 }
 
+const ERC20_TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+
+function indexedAddress(topic) {
+  if (typeof topic !== "string" || !/^0x[0-9a-f]{64}$/i.test(topic) || !/^0{24}/i.test(topic.slice(2, 26))) return null;
+  return addressOf("0x" + topic.slice(-40));
+}
+
+export function decodeErc20TransferLog(log) {
+  if (!log || typeof log !== "object" || !Array.isArray(log.topics) || log.topics.length !== 3) return null;
+  if (typeof log.topics[0] !== "string" || log.topics[0].toLowerCase() !== ERC20_TRANSFER_TOPIC) return null;
+  const token = addressOf(log.address);
+  const from = indexedAddress(log.topics[1]);
+  const to = indexedAddress(log.topics[2]);
+  if (!token || !from || !to || typeof log.data !== "string" || !/^0x[0-9a-f]{64}$/i.test(log.data)) return null;
+  return { token, from, to, amountRaw: BigInt(log.data).toString() };
+}
+
 export function analyzeThreatIntelligence(reports, overrides = {}) {
   if (!Array.isArray(reports)) throw new TypeError("Reports must be an array");
   const rules = { ...DEFAULT_RULES, ...overrides };
@@ -52,7 +69,7 @@ export function analyzeThreatIntelligence(reports, overrides = {}) {
   const grouped = new Map();
   const upgradesByChain = new Map();
   const senderActivity = new Map();
-  const transactionObservations = [];
+  const transactionObservations = [];\n  const tokenTransferCandidates = [];
 
   for (const report of validReports) {
     const chainId = chainIdOf(report);
@@ -104,6 +121,22 @@ export function analyzeThreatIntelligence(reports, overrides = {}) {
           from: addressOf(observation.value.from),
           to: addressOf(observation.value.to)
         });
+      }
+
+      if (observation.kind === "receipt" && observation.value && Array.isArray(observation.value.logs)) {
+        const receipt = observation.value;
+        for (const log of receipt.logs) {
+          const decoded = decodeErc20TransferLog(log);
+          if (!decoded) continue;
+          const blockNumber = log.blockNumber || receipt.blockNumber || report.provenance?.blockNumber || null;
+          const txHash = log.transactionHash || receipt.transactionHash || (report.subjectType === "transaction" ? report.subject : null);
+          tokenTransferCandidates.push({
+            chainId, caseSubject: subject, transactionHash: typeof txHash === "string" ? txHash.toLowerCase() : null,
+            blockNumber: typeof blockNumber === "string" && /^0x[0-9a-f]+$/i.test(blockNumber) ? blockNumber.toLowerCase() : null,
+            logIndex: typeof log.logIndex === "string" && /^0x[0-9a-f]+$/i.test(log.logIndex) ? log.logIndex.toLowerCase() : null,
+            ...decoded
+          });
+        }
       }
 
       if (observation.kind === "erc1967-slots") {
@@ -274,6 +307,18 @@ export function analyzeThreatIntelligence(reports, overrides = {}) {
       if (profile.transactionHashes.length < 25 && !profile.transactionHashes.includes(tx.transactionHash)) profile.transactionHashes.push(tx.transactionHash);
     }
   }
+  const transferMap = new Map();
+  for (const transfer of tokenTransferCandidates) {
+    if (!transfer.transactionHash || !transfer.logIndex || !transfer.blockNumber) continue;
+    const key = transfer.chainId + "|" + transfer.transactionHash + "|" + transfer.logIndex;
+    if (!transferMap.has(key)) transferMap.set(key, transfer);
+  }
+  const tokenTransfers = [...transferMap.values()].sort((a, b) =>
+    a.chainId.localeCompare(b.chainId) ||
+    (BigInt(a.blockNumber) < BigInt(b.blockNumber) ? -1 : BigInt(a.blockNumber) > BigInt(b.blockNumber) ? 1 : 0) ||
+    (BigInt(a.logIndex) < BigInt(b.logIndex) ? -1 : BigInt(a.logIndex) > BigInt(b.logIndex) ? 1 : 0)
+  );
+
   const addressProfiles = [...profileMap.values()].map(profile => ({
     chainId: profile.chainId,
     address: profile.address,
