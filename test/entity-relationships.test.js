@@ -1,0 +1,10 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {buildEntityNeighborhood} from "../src/entity-relationships.js";
+const a="0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",b="0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",c="0xcccccccccccccccccccccccccccccccccccccccc",d="0xdddddddddddddddddddddddddddddddddddddddd";
+const graph={schema:"sentinel.correlation-graph.v1",edges:[{chainId:"0x1",type:"observed-transaction-flow",from:a,to:b,evidence:[{caseSubjects:["case-a"]}]},{chainId:"0x38",type:"observed-transaction-flow",from:a,to:d,evidence:[]}]};
+const intel={schema:"sentinel.threat-intelligence.v1",tokenTransfers:[{chainId:"0x1",from:b,to:c,token:d,transactionHash:"0x1",blockNumber:"0x10",logIndex:"0x0",amountRaw:"100"}],transactionLinks:[{chainId:"0x1",from:c,via:d,to:a,transactionHashes:["0x2"]}]};
+test("expands a deterministic neighborhood using observed evidence only",()=>{const r=buildEntityNeighborhood({graph,threatIntelligence:intel,chainId:"0x1",address:a,maxDepth:2});assert.equal(r.schema,"sentinel.entity-neighborhood.v1");assert.deepEqual(r.nodes.map(n=>n.address),[a,b,c].sort());assert.equal(r.edges.length,2);assert.equal(r.summary.nodeCount,3);assert.equal(r.assessment.verdict,"not-assessed");});
+test("keeps graph and receipt relationships chain scoped",()=>{const r=buildEntityNeighborhood({graph,threatIntelligence:intel,chainId:"0x1",address:a,maxDepth:3});assert.ok(!r.nodes.some(n=>n.address===d));});
+test("supports transaction handoff expansion and bounded depth",()=>{const r=buildEntityNeighborhood({graph:{schema:"sentinel.correlation-graph.v1",edges:[]},threatIntelligence:intel,chainId:"0x1",address:a,maxDepth:1});assert.equal(r.edges.length,0);});
+test("validates address and bounds",()=>{assert.throws(()=>buildEntityNeighborhood({graph,threatIntelligence:intel,chainId:"0x1",address:"bad"}),/valid EVM address/);assert.throws(()=>buildEntityNeighborhood({graph,threatIntelligence:intel,chainId:"0x1",address:a,maxDepth:4}),/between 1 and 3/);assert.throws(()=>buildEntityNeighborhood({graph,threatIntelligence:intel,chainId:"0x1",address:a,maxNodes:501}),/between 1 and 500/);});
