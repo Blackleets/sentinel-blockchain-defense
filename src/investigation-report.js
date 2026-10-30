@@ -1,4 +1,4 @@
-const clean=value=>String(value??"").replace(/\\/g,"\\\\").replace(/([\\`*_{}\[\]()#+.!|>~])/g,"\\$1").replace(/[\r\n]+/g," ");
+const clean=value=>String(value??"").replace(/\\/g,"\\\\").replace(/([\\`*_{}\[\]()#+!|>~])/g,"\\$1").replace(/[\r\n]+/g," ");
 const code=value=>"`"+String(value??"").replace(/`/g,"\\`").replace(/[\r\n]+/g," ")+"`";
 const list=(items,render,empty="None recorded.")=>items?.length?items.map(item=>"- "+render(item)).join("\n"): "- "+empty;
 const count=(value)=>Number.isFinite(value)?String(value):"Not available";
