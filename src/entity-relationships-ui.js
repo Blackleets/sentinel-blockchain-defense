@@ -7,6 +7,7 @@ import {renderEvidenceGapAnalysis} from "./evidence-gap-ui.js";
 import {renderInvestigationPlaybook} from "./investigation-playbook-ui.js";
 import {buildInvestigationIntelligence} from "./investigation-intelligence.js";
 import {investigationPlaybookStorageKey} from "./investigation-playbook.js";
+import {hypothesisLedgerStorageKey,reconcileHypothesisLedger,recordHypothesisAssessment} from "./hypothesis-ledger.js";
 const SVG="http://www.w3.org/2000/svg";
 const TYPE_LABELS={"observed-transaction-flow":"Transaction flow","observed-token-transfer-log":"Token transfer log","transaction-handoff":"Transaction handoff","shared-erc1967-implementation":"Shared ERC-1967 implementation","shared-erc1967-admin-slot":"Shared ERC-1967 admin slot","shared-erc1967-beacon":"Shared ERC-1967 beacon","shared-eip7702-delegation-target":"Shared EIP-7702 target"};
 const TYPE_COLORS={"correlation-graph":"#64d7e8","receipt-log":"#a78bfa","transaction-handoff":"#f6b95d","shared-infrastructure":"#e879b8"};
@@ -32,26 +33,60 @@ function renderInvestigationIntelligence(container,inputs){
  container.replaceChildren();
  const heading=document.createElement("div");heading.className="sentinel-rel-kicker";heading.textContent="SENTINEL / CASE SYNTHESIS";
  const title=document.createElement("h4");title.textContent="INVESTIGATION INTELLIGENCE DOSSIER";
- const description=document.createElement("p");description.textContent="A reproducible case file combining the bounded evidence timeline, testable hypotheses, source coverage and analyst workflow. No external enrichment or automated verdict.";
+ const description=document.createElement("p");description.textContent="A reproducible case file with an evidence timeline, testable hypotheses and a persistent analyst review ledger. No external enrichment or automated verdict.";
  container.append(heading,title,description);
  if(!inputs.playbook){const note=document.createElement("p");note.className="sentinel-rel-muted";note.textContent="Build the investigation playbook before generating a dossier.";container.appendChild(note);return;}
+ let ledger,storageWarning="";
+ const storageKey=hypothesisLedgerStorageKey(inputs.neighborhood.subject);
+ try{
+  const saved=JSON.parse(localStorage.getItem(storageKey)||"null");
+  ledger=reconcileHypothesisLedger({ledger:saved,subject:inputs.neighborhood.subject,hypotheses:buildInvestigationIntelligence(inputs).hypotheses,createdAt:new Date().toISOString()});
+  localStorage.setItem(storageKey,JSON.stringify(ledger));
+ }catch(error){
+  try{ledger=reconcileHypothesisLedger({subject:inputs.neighborhood.subject,hypotheses:buildInvestigationIntelligence(inputs).hypotheses,createdAt:new Date().toISOString()});}
+  catch(inner){const note=document.createElement("p");note.className="sentinel-rel-muted";note.textContent=inner.message;container.appendChild(note);return;}
+  storageWarning="Local persistence unavailable or previous ledger invalid: "+error.message;
+ }
  let dossier;
- try{dossier=buildInvestigationIntelligence(inputs);}catch(error){const note=document.createElement("p");note.className="sentinel-rel-muted";note.textContent=error.message;container.appendChild(note);return;}
+ try{dossier=buildInvestigationIntelligence({...inputs,hypothesisLedger:ledger});}catch(error){const note=document.createElement("p");note.className="sentinel-rel-muted";note.textContent=error.message;container.appendChild(note);return;}
  const metrics=document.createElement("div");metrics.className="sentinel-rel-compare-result";
- for(const [label,value] of [["TIMELINE ENTRIES",dossier.summary.timelineEntryCount],["TESTABLE HYPOTHESES",dossier.summary.hypothesisCount],["SOURCE REFERENCES",dossier.summary.sourceReferenceCount],["OPEN TASKS",dossier.summary.playbook.pending+dossier.summary.playbook.inProgress]]){
+ for(const [label,value] of [["TIMELINE ENTRIES",dossier.summary.timelineEntryCount],["TESTABLE HYPOTHESES",dossier.summary.hypothesisCount],["SOURCE REFERENCES",dossier.summary.sourceReferenceCount],["OPEN TASKS",dossier.summary.playbook.pending+dossier.summary.playbook.inProgress],["ANALYST ASSESSMENTS",dossier.summary.hypothesisReview.assessmentCount]]){
   const card=document.createElement("div");card.className="sentinel-rel-compare-metric";const number=document.createElement("b");number.textContent=String(value);const caption=document.createElement("span");caption.textContent=label;card.append(number,caption);metrics.appendChild(card);
  }
- const assessment=document.createElement("p");assessment.className="sentinel-playbook-warning";assessment.textContent="ASSESSMENT: NOT ASSESSED · No risk score · Hypotheses remain unverified.";
+ const assessment=document.createElement("p");assessment.className="sentinel-playbook-warning";assessment.textContent="CASE ASSESSMENT: NOT ASSESSED · No risk score · Analyst reviews are attributed to the local operator and are not automatically verified.";
  const hypotheses=document.createElement("div");hypotheses.className="sentinel-playbook-list";
+ const labels={open:"OPEN",supported:"SUPPORTED BY ANALYST", "not-supported":"NOT SUPPORTED BY ANALYST",inconclusive:"INCONCLUSIVE"};
  for(const item of dossier.hypotheses){
+  const entry=ledger.entries.find(value=>value.id===item.id);
+  if(!entry)continue;
   const card=document.createElement("article");card.className="sentinel-playbook-task";
   const question=document.createElement("strong");question.textContent=item.question;
   const why=document.createElement("p");why.textContent=item.why;
   const check=document.createElement("div");check.className="sentinel-gap-check";
   const label=document.createElement("b");label.textContent="HOW TO TEST";
   const detail=document.createElement("p");detail.textContent=item.verification;check.append(label,detail);
-  const state=document.createElement("small");state.className="sentinel-playbook-source";state.textContent="STATUS: UNVERIFIED"+(item.supportingReferences.length?" · "+item.supportingReferences.length+" reference(s)":"");
-  card.append(question,why,check,state);hypotheses.appendChild(card);
+  const state=document.createElement("small");state.className="sentinel-playbook-source";state.textContent="ANALYST REVIEW: "+labels[entry.status]+" · "+entry.assessments.length+" appended assessment(s)";
+  const controls=document.createElement("div");controls.className="sentinel-playbook-controls";
+  const status=document.createElement("select");status.setAttribute("aria-label","Analyst assessment status for "+item.id);
+  for(const value of ["open","supported","not-supported","inconclusive"]){const option=document.createElement("option");option.value=value;option.textContent=labels[value];status.appendChild(option);}
+  status.value=entry.status;
+  const reference=document.createElement("input");reference.placeholder="Evidence reference (case / tx / log / URL)";reference.setAttribute("aria-label","Evidence reference for "+item.id);
+  const note=document.createElement("textarea");note.rows=2;note.placeholder="Analyst rationale — what was checked and what remains uncertain";note.setAttribute("aria-label","Analyst rationale for "+item.id);
+  const save=document.createElement("button");save.type="button";save.textContent="APPEND REVIEW";
+  const feedback=document.createElement("small");feedback.className="sentinel-playbook-warning";
+  save.addEventListener("click",()=>{
+   try{
+    ledger=recordHypothesisAssessment(ledger,item.id,{status:status.value,note:note.value,evidenceReference:reference.value,updatedAt:new Date().toISOString()});
+    localStorage.setItem(storageKey,JSON.stringify(ledger));
+    renderInvestigationIntelligence(container,inputs);
+   }catch(error){feedback.textContent=error.message;feedback.dataset.error="true";}
+  });
+  controls.append(status,reference,note,save);
+  const history=document.createElement("details");const historyTitle=document.createElement("summary");historyTitle.textContent="ASSESSMENT HISTORY ("+entry.assessments.length+")";history.appendChild(historyTitle);
+  const historyList=document.createElement("ol");historyList.className="sentinel-playbook-history";
+  for(const review of entry.assessments){const line=document.createElement("li");line.textContent=review.updatedAt+" · "+labels[review.status]+" · "+review.note+(review.evidenceReference?" · ref: "+review.evidenceReference:"");historyList.appendChild(line);}
+  history.appendChild(historyList);
+  card.append(question,why,check,state,controls,feedback,history);hypotheses.appendChild(card);
  }
  const timeline=document.createElement("details");const summary=document.createElement("summary");summary.textContent="PREVIEW EVIDENCE TIMELINE ("+dossier.timeline.length+")";const list=document.createElement("ol");list.className="sentinel-playbook-history";
  for(const item of dossier.timeline.slice(0,30)){const line=document.createElement("li");line.textContent=item.kind+" · block "+(item.blockNumber??"unknown")+" · "+(item.transactionHash||"no transaction hash")+" · "+item.source;list.appendChild(line);}
@@ -60,13 +95,18 @@ function renderInvestigationIntelligence(container,inputs){
  const exportButton=document.createElement("button");exportButton.type="button";exportButton.textContent="EXPORT SEALED INVESTIGATION DOSSIER ↓";
  exportButton.addEventListener("click",async()=>{
   try{
-   let latest=inputs.playbook;
-   try{const saved=JSON.parse(localStorage.getItem(investigationPlaybookStorageKey(inputs.neighborhood.subject))||"null");if(saved?.schema==="sentinel.investigation-playbook.v1")latest=saved;}catch{}
-   const fresh=buildInvestigationIntelligence({...inputs,playbook:latest,generatedAt:new Date().toISOString()});
+   let latest=ledger;
+   try{const saved=JSON.parse(localStorage.getItem(storageKey)||"null");if(saved?.schema==="sentinel.hypothesis-ledger.v1")latest=saved;}catch{}
+   let latestPlaybook=inputs.playbook;
+   try{const saved=JSON.parse(localStorage.getItem(investigationPlaybookStorageKey(inputs.neighborhood.subject))||"null");if(saved?.schema==="sentinel.investigation-playbook.v1")latestPlaybook=saved;}catch{}
+   const fresh=buildInvestigationIntelligence({...inputs,playbook:latestPlaybook,hypothesisLedger:latest,generatedAt:new Date().toISOString()});
    await exportSealedJson(fresh,"sentinel-investigation-dossier-"+fresh.subject.chainId+"-"+fresh.subject.address+"-sealed.json");
   }catch(error){const note=document.createElement("p");note.className="sentinel-playbook-warning";note.dataset.error="true";note.textContent=error.message;container.appendChild(note);}
  });
- container.append(metrics,assessment,hypotheses,timeline,caveat,exportButton);
+ const exportLedger=document.createElement("button");exportLedger.type="button";exportLedger.textContent="EXPORT HYPOTHESIS REVIEW LEDGER ↓";
+ exportLedger.addEventListener("click",()=>exportSealedJson(ledger,"sentinel-hypothesis-ledger-"+ledger.subject.chainId+"-"+ledger.subject.address+"-sealed.json").catch(error=>{storageWarning=error.message;}));
+ const warning=document.createElement("p");warning.className="sentinel-playbook-warning";warning.textContent=storageWarning||"Analyst assessments are stored locally in this browser. Export the ledger to preserve a portable copy.";
+ container.append(metrics,assessment,hypotheses,timeline,caveat,warning,exportButton,exportLedger);
 }
 
 export function mountEntityRelationshipExplorer(container,graph,threatIntelligence){
