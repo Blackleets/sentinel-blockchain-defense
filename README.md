@@ -12,7 +12,8 @@ SENTINEL is an evidence-led, read-only Ethereum security research workspace. The
 - Static EVM bytecode disassembly that correctly skips PUSH immediate data.\n- ERC-1967 implementation, admin and beacon slot inspection, including a read-only beacon implementation() lookup when applicable.\n- Contract bytecode analysis follows a resolved ERC-1967 implementation when available.\n- Explainable contract capability evidence for CALL-family operations, CREATE/CREATE2, SELFDESTRUCT, SSTORE and TSTORE.\n- PUSH4 selector candidates, explicitly not treated as verified ABI functions.
 - Bounded recent ERC-1967 event history (`Upgraded`, `AdminChanged`, `BeaconUpgraded`) via read-only `eth_getLogs`, with explicit scanned block range and partial-history caveats.
 - Heuristic UUPS / ERC-1822 selector indicators (`proxiableUUID`, `upgradeTo`, `upgradeToAndCall`) clearly labelled as selector candidates, never proof of a working upgrade path.
-- Unit tests for proxy-event decoding and chronological ordering.\n- Unit tests for EIP-7702 parsing, bytecode decoding, capability evidence and exact ETH formatting.
+- Export a provenance-labelled JSON evidence snapshot for address and transaction inspections, including provider, chain ID, block context and explicit non-verdict caveats.
+- Unit tests for case-report schema validation, proxy-event decoding and chronological ordering.\n- Unit tests for EIP-7702 parsing, bytecode decoding, capability evidence and exact ETH formatting.
 - GitHub Actions CI runs the Node.js test suite on pushes and pull requests.
 - Show raw observations, network context and query timestamp.
 - Responsive dark security-console interface; no build step or installation required.
@@ -32,7 +33,7 @@ Because the application uses native JavaScript modules, serve the repository ove
 
 ## Scope and limitations
 
-This is an early functional foundation, not a complete smart-contract audit platform. It currently targets Ethereum Mainnet and does not yet provide full historical tracing (the current proxy-event view scans only a bounded recent block window), contract source verification, bytecode decompilation, automated exploit simulation, monitoring, alert delivery or a calibrated risk score. The interface must not be used as the sole basis for financial or security decisions.
+This is an early functional foundation, not a complete smart-contract audit platform. It currently targets Ethereum Mainnet and does not yet provide persistent case storage or full historical tracing (the current proxy-event view scans only a bounded recent block window), contract source verification, bytecode decompilation, automated exploit simulation, monitoring, alert delivery or a calibrated risk score. The interface must not be used as the sole basis for financial or security decisions.
 
 ## Roadmap
 
