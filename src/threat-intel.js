@@ -378,6 +378,7 @@ export function analyzeThreatIntelligence(reports, overrides = {}) {
     timeline: timelines,
     transactionLinks,
     addressProfiles,
+    tokenTransfers,
     warnings,
     assessment: {
       verdict: "not-assessed",
