@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { fetchBlockscoutAddressTransfers, fetchBlockscoutAddressActivity, BLOCKSCOUT_ENDPOINTS } from "../src/blockscout-provider.js";
 const address="0x1111111111111111111111111111111111111111",from="0x2222222222222222222222222222222222222222",to="0x4444444444444444444444444444444444444444",token="0x3333333333333333333333333333333333333333",hash="0x"+"a".repeat(64);
 const transfer=(overrides={})=>({token_type:"ERC-20",transaction_hash:hash,block_number:100,log_index:2,from:{hash:from},to:{hash:address},token:{address_hash:token,symbol:"USDC",name:"USD Coin",decimals:"6"},total:{value:"1234500",decimals:"6"},timestamp:"2026-10-30T12:00:00.000000Z",...overrides});
-const tx=(overrides={})=>({hash,block_number:100,position:3,from:{hash:address},to:{hash},value:"1000000000000000000",timestamp:"2026-10-30T12:00:00.000000Z",status:"ok",...overrides});
+const tx=(overrides={})=>({hash,block_number:100,position:3,from:{hash:address},to:{hash:to},value:"1000000000000000000",timestamp:"2026-10-30T12:00:00.000000Z",status:"ok",...overrides});
 const internal=(overrides={})=>({transaction_hash:"0x"+"b".repeat(64),block_number:101,index:2,from:{hash:from},to:{hash:address},value:"500000000000000000",success:true,timestamp:"2026-10-30T12:00:00.000000Z",...overrides});
 const response=(items,next_page_params=null)=>({ok:true,status:200,json:async()=>({items,next_page_params})});
 test("normalizes paginated ERC20 records and keeps raw base units",async()=>{
