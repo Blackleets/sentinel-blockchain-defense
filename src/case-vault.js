@@ -79,7 +79,7 @@ export function createIndexedDbCaseVaultStore({indexedDB=globalThis.indexedDB,da
   const transaction=db.transaction(storeName,mode),store=transaction.objectStore(storeName);
   let result;
   try{result=run(store);}catch(error){reject(error);return;}
-  transaction.oncomplete=()=>resolve(result?.result??result);
+  transaction.oncomplete=()=>resolve(result&&typeof result==="object"&&"result" in result?result.result:result);
   transaction.onerror=()=>reject(transaction.error||new Error("Local case vault transaction failed."));
   transaction.onabort=()=>reject(transaction.error||new Error("Local case vault transaction was aborted."));
  }));
