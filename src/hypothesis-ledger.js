@@ -62,15 +62,6 @@ export function summarizeHypothesisLedger(ledger){
   assessmentCount:entries.reduce((sum,item)=>sum+item.assessments.length,0)};
 }
 
-const ADDRESS=/^0x[0-9a-f]{40}$/i;
-const STATUSES=new Set(["open","supported","not-supported","inconclusive"]);
-const clone=value=>JSON.parse(JSON.stringify(value));
-const validDate=value=>typeof value==="string"&&!Number.isNaN(Date.parse(value));
-const stable=value=>JSON.stringify(value,Object.keys(value||{}).sort());
-const cleanSubject=subject=>{
- if(!subject||typeof subject.chainId!=="string"||!ADDRESS.test(subject.address||""))throw new TypeError("A valid chain and EVM subject address are required");
- return {chainId:subject.chainId.toLowerCase(),address:subject.address.toLowerCase()};
-};
 const sameAssessment=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 function validateLedger(ledger,subject,label){
  if(!ledger||ledger.schema!=="sentinel.hypothesis-ledger.v1"||!Array.isArray(ledger.entries))throw new TypeError(label+" is not a valid SENTINEL hypothesis ledger");
