@@ -257,10 +257,12 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
       if(lastError)throw new Error("RPC could not scan the requested window: "+lastError.message);
       const requestedHops = Number(form.elements.hops.value);
       const from=latest>BigInt(windowBlocks)?latest-BigInt(windowBlocks):0n;
-      let allLogs = logs.slice(), expansionFailures = 0, expandedAddresses = 0;
+      let allLogs = logs.slice(), expansionFailures = 0, expandedAddresses = 0, expansionCandidates = 0;
       const rootTransfers = decodeTransferLogs(logs,{chainId:network.chainId});
       if (requestedHops === 2) {
-        const peers = [...new Set(rootTransfers.map(edge => edge.from === address ? edge.to : edge.from).filter(peer => peer !== address))].slice(0,8);
+        const allPeers = [...new Set(rootTransfers.map(edge => edge.from === address ? edge.to : edge.from).filter(peer => peer !== address))];
+        expansionCandidates = allPeers.length;
+        const peers = allPeers.slice(0,8);
         const expanded = await Promise.allSettled(peers.map(async peer => {
           const [sent,received] = await Promise.all([
             rpc("eth_getLogs",[{fromBlock:"0x"+from.toString(16),toBlock:latestHex,topics:[ERC20_TRANSFER_TOPIC,addressTopic(peer)]}]),
@@ -277,7 +279,7 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
       const graph=buildLiveTransferGraph(transfers,{address,chainId:network.chainId,scannedFrom:from.toString(),scannedTo:latest.toString(),hops:requestedHops,maxEdges:160,maxNodes:40});
       tokenMetadata = await fetchMetadataBatch(graph.edges.map(edge => edge.token), rpc);
       render(graph);
-      status.textContent=network.name+" · "+requestedHops+" hop(s) · scanned "+windowBlocks.toLocaleString()+" blocks · expanded "+expandedAddresses+"/8 counterparties"+(expansionFailures?" · "+expansionFailures+" expansion queries failed":"")+" · "+new Date().toISOString();
+      status.textContent=network.name+" · "+requestedHops+" hop(s) · scanned "+windowBlocks.toLocaleString()+" blocks"+(requestedHops===2?" · expanded "+expandedAddresses+"/"+Math.min(expansionCandidates,8)+" counterparties"+(expansionCandidates>8?" (8-counterparty cap)":""):"")+(expansionFailures?" · "+expansionFailures+" expansion queries failed":"")+(graph.truncated?" · graph reached its node/edge cap":"")+" · "+new Date().toISOString();
     }catch(error){canvas.innerHTML='<div class="sl-empty sl-error">'+esc(error.message)+'</div>';status.textContent="Live trace failed. The provider may limit eth_getLogs range or availability.";status.classList.add("sl-error");}
     finally{form.querySelector("button").disabled=false;form.querySelector("button").textContent="Trace address ↗";}
   });
