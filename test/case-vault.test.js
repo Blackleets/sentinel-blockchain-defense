@@ -40,3 +40,26 @@ test("rejects malformed metadata and invalid adapter configuration",()=>{
  assert.throws(()=>createCaseVaultRecord({...seal,digest:"bad"}),/sealed SENTINEL/);
  assert.throws(()=>createCaseVault({}),/storage adapter/);
 });
+
+test("exports and restores a sealed archive backup with inner dossier verification",async()=>{
+ const sourceStore=memoryStore(),verify=async value=>value?.schema==="sentinel.evidence-integrity-seal.v1"&&["a".repeat(64),"b".repeat(64)].includes(value.digest);
+ const sourceVault=createCaseVault({store:sourceStore,verifySeal:verify,validateDossier:validate,clock:()=>"2026-10-30T12:01:00.000Z"});
+ await sourceVault.save(seal);
+ const backup=await sourceVault.exportBackup();
+ assert.equal(backup.schema,"sentinel.case-vault-backup.v1");
+ assert.equal(backup.recordCount,1);
+ const backupSeal={schema:"sentinel.evidence-integrity-seal.v1",algorithm:"SHA-256",canonicalization:"sorted-object-keys-v1",digest:"b".repeat(64),artifact:backup};
+ const targetStore=memoryStore(),targetVault=createCaseVault({store:targetStore,verifySeal:verify,validateDossier:validate});
+ assert.deepEqual(await targetVault.importBackup(backupSeal),{added:1,duplicates:0});
+ assert.deepEqual(await targetVault.importBackup(backupSeal),{added:0,duplicates:1});
+ assert.equal((await targetVault.list({chainId:"0x1",address:subject.address})).length,1);
+});
+test("rejects a backup with a tampered inner dossier seal before writing records",async()=>{
+ const verify=async value=>value?.schema==="sentinel.evidence-integrity-seal.v1"&&value.digest==="b".repeat(64);
+ const store=memoryStore(),vault=createCaseVault({store,verifySeal:verify,validateDossier:validate});
+ const record=createCaseVaultRecord(seal,{savedAt:"2026-10-30T12:01:00.000Z"});
+ const backup={schema:"sentinel.case-vault-backup.v1",createdAt:"2026-10-30T12:02:00.000Z",recordCount:1,records:[{...record,envelope:{...seal,digest:"a".repeat(64)}}]};
+ const backupSeal={schema:"sentinel.evidence-integrity-seal.v1",algorithm:"SHA-256",canonicalization:"sorted-object-keys-v1",digest:"b".repeat(64),artifact:backup};
+ await assert.rejects(()=>vault.importBackup(backupSeal),/inner integrity check/);
+ assert.equal((await store.getAll()).length,0);
+});
