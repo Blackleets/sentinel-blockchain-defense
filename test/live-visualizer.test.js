@@ -50,6 +50,7 @@ test("expands relationship graph to two bounded hops",()=>{
  const two=buildLiveTransferGraph(transfers,{address:a,chainId:"0x1",hops:2});
  assert.equal(one.nodeCount,2);assert.equal(one.edgeCount,1);
  assert.equal(two.nodeCount,3);assert.equal(two.edgeCount,2);assert.equal(two.hops,2);
+ const exactCap=buildLiveTransferGraph(transfers.slice(0,1),{address:a,chainId:"0x1",hops:1,maxNodes:2});assert.equal(exactCap.nodeCount,2);assert.equal(exactCap.truncated,false);
  const capped=buildLiveTransferGraph(transfers,{address:a,chainId:"0x1",hops:2,maxNodes:2});
  assert.equal(capped.nodeCount,2);assert.equal(capped.truncated,true);
 });
