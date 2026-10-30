@@ -206,9 +206,9 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
   const form = panel.querySelector("form"), status = panel.querySelector('[data-role="status"]');
   const stats = panel.querySelector('[data-role="stats"]'), canvas = panel.querySelector('[data-role="canvas"]');
   const inspector = panel.querySelector('[data-role="inspector"]'), ledger = panel.querySelector('[data-role="ledger"]');
-  const investigationTools=panel.querySelector('[data-role="investigation-tools]');
-  const flowFilter=panel.querySelector('[data-role="flow-filter]'),assetFilter=panel.querySelector('[data-role="asset-filter]');
-  const timeline=panel.querySelector('[data-role="timeline]'),timelineList=panel.querySelector('[data-role="timeline-list]'),timelineCount=panel.querySelector('[data-role="timeline-count]');
+  const investigationTools=panel.querySelector('[data-role="investigation-tools"]');
+  const flowFilter=panel.querySelector('[data-role="flow-filter"]'),assetFilter=panel.querySelector('[data-role="asset-filter"]');
+  const timeline=panel.querySelector('[data-role="timeline"]'),timelineList=panel.querySelector('[data-role="timeline-list"]'),timelineCount=panel.querySelector('[data-role="timeline-count"]');
   let current = null, selected = null, activeNode = null;
   let tokenMetadata = new Map();
   const renderNodeLedger = address => {
@@ -253,7 +253,7 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
     ].map(([label,value])=>'<span class="sl-stat"><b>'+esc(value)+'</b>'+esc(label)+'</span>').join('');
     investigationTools.hidden=false;
     const assets=[...new Set(graph.edges.map(edge=>edge.token))];
-    assetFilter.innerHTML='<option value="all">All assets ('+assets.length+')</option>'+assets.map(token=>{const meta=tokenMetadata.get(token)||{};return '<option value="'+esc(meta.symbol||short(token))+'" data-token="'+esc(token)+'">'+esc(meta.symbol||short(token))+'</option>';}).join('');
+    assetFilter.innerHTML='<option value="all">All assets ('+assets.length+')</option>'+assets.map(token=>{const meta=tokenMetadata.get(token)||{};return '<option value="'+esc(token)+'">'+esc(meta.symbol||short(token))+'</option>';}).join('');
     assetFilter.value="all";flowFilter.value="all";
     const ordered=graph.edges.slice().sort((a,b)=>{const x=BigInt(a.blockNumber),y=BigInt(b.blockNumber);if(x!==y)return x<y?-1:1;const li=BigInt(a.logIndex),ri=BigInt(b.logIndex);return li<ri?-1:li>ri?1:0;});
     timeline.hidden=false;timelineCount.textContent=ordered.length+' events · block order';
@@ -289,7 +289,7 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
     if(!current)return;
     const bundle={schema:"sentinel.evidence-export.v1",exportedAt:new Date().toISOString(),chainId:current.chainId,origin:current.origin,coverage:current.coverage,provider:current.provider||null,scannedFrom:current.scannedFrom,scannedTo:current.scannedTo,hops:current.hops,nodeCount:current.nodeCount,edgeCount:current.edgeCount,totalObservedEdges:current.totalObservedEdges,truncated:Boolean(current.truncated),limitations:current.limitations||[],nodes:current.nodes,edges:current.edges.map(edge=>({...edge,tokenMetadata:tokenMetadata.get(edge.token)||null}))};
     const blob=new Blob([JSON.stringify(bundle,null,2)],{type:"application/json"});
-    const url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download="sentinel-evidence-"+current.chainId+"-"+current.origin.slice(2,10)+".json";document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
+    const url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download="sentinel-evidence-"+current.chainId+"-"+current.origin.slice(2,10)+".json";document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
   });
   panel.querySelector('[data-role="fund-run"]').addEventListener("click",()=>{
     if(!current){fundResults.textContent="Run an address trace before reconstructing candidate routes.";return;}
