@@ -32,7 +32,37 @@ export function createCaseVault({store,verifySeal,validateDossier,clock=()=>new 
   const record=await store.get(id);
   return record?clone(record):null;
  }
- return {save,list,get};
+ async function exportBackup(){
+  const records=await store.getAll();
+  return {schema:"sentinel.case-vault-backup.v1",createdAt:clock(),recordCount:records.length,
+   records:clone(records),limitations:[
+    "This backup contains browser-local sealed dossier snapshots and their metadata.",
+    "Each inner dossier seal must be verified independently; the outer backup seal protects the backup envelope as a whole.",
+    "SHA-256 integrity does not authenticate authorship or establish evidence truth."
+   ]};
+ }
+ async function importBackup(backupSeal){
+  if(!await verifySeal(backupSeal))throw new Error("Case vault backup integrity verification failed; import rejected.");
+  const backup=backupSeal.artifact;
+  if(!backup||backup.schema!=="sentinel.case-vault-backup.v1"||!validDate(backup.createdAt)||!Array.isArray(backup.records)||backup.recordCount!==backup.records.length)throw new TypeError("Unsupported or malformed SENTINEL case vault backup.");
+  const prepared=[];
+  for(const item of backup.records){
+   if(!item||item.schema!=="sentinel.case-vault-record.v1"||!item.envelope)throw new TypeError("Backup contains a malformed archive record.");
+   if(!await verifySeal(item.envelope))throw new Error("An archived dossier failed its inner integrity check; import rejected.");
+   const validation=validateDossier(item.envelope.artifact);
+   if(!validation?.valid)throw new Error("An archived dossier failed structural validation: "+(validation?.errors||["unknown validation error"]).join(" · "));
+   const normalized=createCaseVaultRecord(item.envelope,{savedAt:item.savedAt});
+   if(normalized.id!==item.id||normalized.digest!==item.digest||normalized.caseId!==item.caseId||normalized.subject.chainId!==item.subject?.chainId||normalized.subject.address!==item.subject?.address)throw new Error("Archive record metadata does not match its sealed dossier.");
+   prepared.push(normalized);
+  }
+  const summary={added:0,duplicates:0};
+  for(const record of prepared){
+   try{await store.add(record);summary.added++;}
+   catch(error){if(error?.name==="ConstraintError"||error?.code==="DUPLICATE")summary.duplicates++;else throw error;}
+  }
+  return summary;
+ }
+ return {save,list,get,exportBackup,importBackup};
 }
 /** IndexedDB adapter. The archive remains on this browser and is never uploaded. */
 export function createIndexedDbCaseVaultStore({indexedDB=globalThis.indexedDB,databaseName="sentinel-case-vault",storeName="snapshots"}={}){
