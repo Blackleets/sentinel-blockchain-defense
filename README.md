@@ -133,3 +133,13 @@ Important interpretation limits:
 - Internal execution traces are excluded from candidate paths to avoid treating parent transactions and subcalls as independent balance movements.
 - Exact or partial amount compatibility is a heuristic only. It does not prove that the same units of an asset moved between addresses; balances may be pooled, replenished or commingled.
 - No path found means only that no candidate path was found in the supplied bounded records. It is not evidence of inactivity.
+
+## Investigation workspace controls
+
+The Live Visualizer includes an evidence workspace after a successful trace:
+- **Flow filter:** restricts the selected node's transfer ledger to incoming or outgoing records.
+- **Asset filter:** restricts that ledger to one observed token/asset contract. Filters do not mutate the underlying evidence set or alter the graph.
+- **Timeline:** displays up to the latest 50 observed records in descending block/log order. Selecting an event opens its transfer inspector.
+- **Evidence export:** downloads a JSON bundle containing the query origin, chain ID, provider/coverage metadata, scanned block range, graph bounds, limitations, nodes, observed edges and available token metadata.
+
+Exports represent the records loaded for that specific trace, not a complete chain history or an independent attestation. They preserve source coverage and truncation flags so downstream reviewers can interpret the evidence correctly. The timeline is capped at 50 displayed events; the export includes the full in-memory graph evidence returned by the selected bounded query.
