@@ -13,7 +13,9 @@ function report({ chainId = "0x1", subject = hash, subjectType = "transaction", 
     subject,
     subjectType,
     provenance: { blockNumber: "0x10" },
-    observations
+    observations: observations.length || subjectType !== "transaction" ? observations : [
+      { kind: "transaction", value: { hash: subject, blockNumber: "0x10", from: address, to: address } }
+    ]
   };
 }
 
