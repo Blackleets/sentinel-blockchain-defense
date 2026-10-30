@@ -1,7 +1,6 @@
 import {buildEntityNeighborhood} from "./entity-relationships.js";
 import {buildEntityEvidencePacket} from "./entity-evidence-packet.js";
 import {compareObservedEntities} from "./entity-comparison.js";
-import {compareObservedEntities} from "./entity-comparison.js";
 import {layoutEntityNeighborhood} from "./entity-layout.js";
 const SVG="http://www.w3.org/2000/svg";
 const TYPE_LABELS={"observed-transaction-flow":"Transaction flow","observed-token-transfer-log":"Token transfer log","transaction-handoff":"Transaction handoff","shared-erc1967-implementation":"Shared ERC-1967 implementation","shared-erc1967-admin-slot":"Shared ERC-1967 admin slot","shared-erc1967-beacon":"Shared ERC-1967 beacon","shared-eip7702-delegation-target":"Shared EIP-7702 target"};
