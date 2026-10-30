@@ -96,3 +96,13 @@ Evidence before verdict. Explicit source and freshness. Simulations labelled as 
 ## License
 
 No license has been granted yet. All rights reserved by default until a license is added.
+
+## Indexed address history (Ethereum Mainnet)
+
+- The Live Visualizer now offers an optional **Indexed history · Ethereum** source backed by the public Blockscout REST API v2 at `eth.blockscout.com`.
+- It reads paginated ERC-20 transfer records in both directions for the queried address, follows the provider's `next_page_params` cursor, deduplicates transaction/log pairs, and preserves raw integer amounts and provider-supplied token metadata.
+- Each query is capped at 8 pages per direction (up to the provider's page size); the UI reports whether pagination completed or hit the cap. Provider records are indexed observations, not independently attested facts.
+- This indexed source is currently enabled only for Ethereum Mainnet. BNB Smart Chain and Polygon continue to use the bounded public-RPC path until a network-specific indexed endpoint is validated. The indexed path is one-hop only.
+- This does **not** mean complete chain history: it covers the provider's indexed ERC-20 transfer records only. Native transfers, internal calls, arbitrary logs, NFTs, cross-chain activity and unindexed records are excluded. Public endpoint availability, CORS and rate limits may affect results.
+- Blockscout API reference: https://github.com/blockscout/blockscout-api-v2-swagger
+
