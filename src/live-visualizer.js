@@ -70,13 +70,14 @@ export function buildLiveTransferGraph(transfers, { address, chainId, scannedFro
   const hopDistance = new Map([[origin, 0]]);
   let frontier = new Set([origin]);
   const candidates = new Map();
+  let nodeCapReached = false;
   for (let depth = 1; depth <= hops && frontier.size; depth++) {
     const next = new Set();
     for (const edge of all) {
       if (!frontier.has(edge.from) && !frontier.has(edge.to)) continue;
       const other = frontier.has(edge.from) ? edge.to : edge.from;
       if (!reachable.has(other)) {
-        if (reachable.size + next.size >= maxNodes) continue;
+        if (reachable.size + next.size >= maxNodes) { nodeCapReached = true; continue; }
         next.add(other);
       }
       candidates.set(edge.transactionHash + "|" + edge.logIndex, edge);
@@ -98,7 +99,7 @@ export function buildLiveTransferGraph(transfers, { address, chainId, scannedFro
     schema: "sentinel.live-transfer-graph.v1",
     chainId: chainId.toLowerCase(), origin, scannedFrom, scannedTo, hops,
     totalObservedEdges: ordered.length, edgeCount: edges.length, nodeCount: nodes.length,
-    truncated: ordered.length > edges.length || reachable.size >= maxNodes, nodes, edges,
+    truncated: ordered.length > edges.length || nodeCapReached, nodes, edges,
     coverage: "bounded-live-rpc-transfer-event-logs",
     limitations: [
       "Edges are decoded Transfer-shaped logs returned by one public RPC provider; token legitimacy is not established.",
