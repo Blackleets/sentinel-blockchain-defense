@@ -1,12 +1,13 @@
 # SENTINEL — Blockchain Defense Intelligence
 
-SENTINEL is an evidence-led, read-only Ethereum security research workspace. The first release provides a browser-based Ethereum account and transaction inspector with EIP-7702 delegation-marker detection.
+SENTINEL is an evidence-led, read-only multichain EVM security research workspace. The browser inspector supports Ethereum Mainnet, BNB Smart Chain and Polygon PoS with chain-ID verification before accepting inspection data.
 
 **Live repository:** https://github.com/Blackleets/sentinel-blockchain-defense
 
 ## Current release
 
-- Inspect Ethereum Mainnet account addresses using `eth_getCode`, `eth_getBalance`, `eth_getTransactionCount` and `eth_blockNumber`.
+- Select Ethereum Mainnet (chain ID 1), BNB Smart Chain (56) or Polygon PoS (137); each selected RPC endpoint is checked with `eth_chainId` before any inspection result is accepted.
+- Inspect EVM account addresses on the selected network using `eth_getCode`, `eth_getBalance`, `eth_getTransactionCount` and `eth_blockNumber`.
 - Inspect transaction hashes using `eth_getTransactionByHash`, `eth_getTransactionReceipt` and block metadata.
 - Detect the EIP-7702 delegated-code designator prefix `0xef0100`, extract the 20-byte delegation target, and inspect whether that target currently has deployed code.
 - Static EVM bytecode disassembly that correctly skips PUSH immediate data.
@@ -27,7 +28,7 @@ SENTINEL is an evidence-led, read-only Ethereum security research workspace. The
 
 ## Run locally
 
-Because the application uses native JavaScript modules, serve the repository over HTTP rather than opening the file directly. With Node.js 20+, run `npx serve .` from the repository folder and open the local URL it prints. The inspector calls the public Cloudflare Ethereum JSON-RPC endpoint at `https://cloudflare-eth.com`. Browser access depends on endpoint availability and CORS policy.
+Because the application uses native JavaScript modules, serve the repository over HTTP rather than opening the file directly. With Node.js 20+, run `npx serve .` from the repository folder and open the local URL it prints. The inspector uses public RPC endpoints configured in `src/chains.js`: Cloudflare Ethereum, BNB public dataseed and Polygon public RPC. These community/public endpoints may rate-limit, change policy or be unavailable; browser access also depends on CORS. The app fails closed when the returned chain ID does not match the selected network.
 
 ## Security model
 
@@ -40,11 +41,11 @@ Because the application uses native JavaScript modules, serve the repository ove
 
 ## Scope and limitations
 
-This is an early functional foundation, not a complete smart-contract audit platform. It currently targets Ethereum Mainnet and does not yet provide persistent case storage or full historical tracing (the current proxy-event view scans only a bounded recent block window), contract source verification, bytecode decompilation, automated exploit simulation, monitoring, alert delivery or a calibrated risk score. The interface must not be used as the sole basis for financial or security decisions.
+This is an early functional foundation, not a complete smart-contract audit platform. It currently supports three EVM networks through public RPC endpoints and does not yet provide persistent case storage or full historical tracing (the current proxy-event view scans only a bounded recent block window), contract source verification, bytecode decompilation, automated exploit simulation, monitoring, alert delivery or a calibrated risk score. The interface must not be used as the sole basis for financial or security decisions.
 
 ## Roadmap
 
-1. Add configurable RPC providers, chain selection and provider health checks.
+1. Add configurable RPC providers, provider health checks and network-specific explorer links.
 2. Add EIP-7702 history and authorization analysis with clearly sourced evidence.
 3. Expand proxy intelligence beyond ERC-1967 and add verified-contract metadata and historical context.
 4. Add explainable risk indicators with evidence links and confidence boundaries.
