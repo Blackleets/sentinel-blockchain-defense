@@ -2,6 +2,7 @@ import { verifyInvestigationDossierSources } from "./investigation-source-verifi
 import { buildEvidenceConfidenceAssessment } from "./evidence-confidence.js";
 
 const HASH = /^0x[0-9a-f]{64}$/i;
+const ADDRESS = /^0x[0-9a-f]{40}$/i;
 const STATUS_LABELS = { verified: "VERIFIED", conflicting: "CONFLICTING", unknown: "UNKNOWN" };
 const OVERALL_LABELS = {
   corroborated: "CORROBORATED",
@@ -40,7 +41,7 @@ export function buildSourceVerificationDossiers(dossier) {
   const groups = new Map();
   const getGroup = (chainId, subject) => {
     if (typeof chainId !== "string" || !chainId.trim() ||
-        typeof subject !== "string" || !subject.trim()) return null;
+        typeof subject !== "string" || !ADDRESS.test(subject)) return null;
     const id = chainId.toLowerCase();
     if (!groups.has(id)) groups.set(id, {
       schema: "sentinel.investigation-intelligence.v1",
@@ -51,12 +52,19 @@ export function buildSourceVerificationDossiers(dossier) {
   };
 
   for (const report of dossier.cases) {
-    const group = getGroup(report?.chainId || report?.network?.chainId, report?.subject);
+    const transactionObservation = (report?.observations || []).find(item =>
+      item?.kind === "transaction" && item.value && HASH.test(item.value.hash || ""));
+    const candidateAddress = ADDRESS.test(report?.subject || "")
+      ? report.subject
+      : [transactionObservation?.value?.from, transactionObservation?.value?.to]
+          .find(value => typeof value === "string" && ADDRESS.test(value));
+    const group = getGroup(report?.chainId || report?.network?.chainId, candidateAddress);
     if (!group) continue;
     if (report.subjectType === "transaction") {
       addReference(group, report.subject, {
         kind: "observed-transaction-flow",
-        blockNumber: report.provenance?.blockNumber
+        blockNumber: transactionObservation?.value?.blockNumber ?? report.provenance?.blockNumber,
+        record: { from: transactionObservation?.value?.from, to: transactionObservation?.value?.to }
       });
     }
     for (const observation of report.observations || []) {
