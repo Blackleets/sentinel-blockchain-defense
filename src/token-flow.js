@@ -121,7 +121,7 @@ export function findObservedTokenPaths(graph, options = {}) {
   for (const key of keys) {
     const byAddress = adjacency.get(key);
     const visit = (current, visited, pathEdges) => {
-      if (results.length >= maxPaths) { truncated = true; return; }
+      if (results.length > maxPaths) { truncated = true; return; }
       if (pathEdges.length >= maxHops) return;
       for (const edge of byAddress.get(current) || []) {
         const next = normalizeAddress(edge.to);
@@ -143,7 +143,7 @@ export function findObservedTokenPaths(graph, options = {}) {
               caseSubject: item.caseSubject || null
             }))
           });
-          if (results.length >= maxPaths) { truncated = true; return; }
+          if (results.length > maxPaths) { truncated = true; return; }
         } else {
           const nextVisited = new Set(visited);
           nextVisited.add(next);
@@ -155,14 +155,15 @@ export function findObservedTokenPaths(graph, options = {}) {
     if (truncated) break;
   }
   results.sort((a,b) => a.hopCount-b.hopCount || a.chainId.localeCompare(b.chainId) || a.token.localeCompare(b.token) || a.edges.map(e=>e.transactionHash+e.logIndex).join("|").localeCompare(b.edges.map(e=>e.transactionHash+e.logIndex).join("|")));
+  const boundedResults = results.slice(0, maxPaths);
   return {
     schema: "sentinel.observed-token-paths.v1",
     from: start,
     to: target,
     maxHops,
-    pathCount: results.length,
+    pathCount: boundedResults.length,
     truncated,
-    paths: results,
+    paths: boundedResults,
     interpretation: "observed-directed-event-sequences-only",
     limitation: "A path is a sequence of observed Transfer-shaped logs for one chain and token contract. It does not prove that funds were forwarded, that the same assets moved between events, or that addresses share an owner."
   };
