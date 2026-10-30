@@ -62,7 +62,7 @@ export function correlateCases(reports) {
   const edges = new Map();
   const addEdge = (type, left, right, evidence) => {
     if (!left || !right || left === right) return;
-    const [from, to] = [left, right].sort();
+    const [from, to] = type === "observed-transaction-flow" ? [left, right] : [left, right].sort();
     const key = [type, from, to].join("|");
     if (!edges.has(key)) edges.set(key, { id: key, type, from, to, evidence: [] });
     const edge = edges.get(key);
