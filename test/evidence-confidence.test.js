@@ -66,7 +66,7 @@ test("keeps an empty verification run inconclusive", () => {
   assert.equal(result.assessment, "partially-corroborated");
   assert.equal(result.checks.find(item => item.id === "transaction-receipt-consistency").status, "unknown");
   assert.equal(result.checks.find(item => item.id === "canonical-block").status, "unknown");
-  assert.equal(result.checks.find(item => item.id === "reference-coverage").status, "verified");
+  assert.equal(result.checks.find(item => item.id === "reference-coverage").status, "unknown");
 });
 
 test("treats chain ID mismatch as a conflict", () => {
