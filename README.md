@@ -57,6 +57,14 @@ SENTINEL is an evidence-led, read-only multichain EVM security research workspac
 
 Because the application uses native JavaScript modules, serve the repository over HTTP rather than opening the file directly. With Node.js 20+, run `npx serve .` from the repository folder and open the local URL it prints. The inspector uses public RPC endpoints configured in `src/chains.js`: Cloudflare Ethereum, BNB public dataseed and Polygon public RPC. These community/public endpoints may rate-limit, change policy or be unavailable; browser access also depends on CORS. The app fails closed when the returned chain ID does not match the selected network.
 
+## Live Visualizer (bounded RPC evidence)
+
+- Trace an arbitrary EVM address against the currently selected Ethereum, BNB Smart Chain or Polygon public RPC endpoint.
+- Query a user-selected recent block window for indexed ERC-20 `Transfer(address,address,uint256)` event logs where the address is sender or recipient.
+- Render an address-centred interactive relationship graph, node inspector and transaction evidence ledger. Every displayed edge links to its transaction in the selected chain explorer.
+- The trace verifies the RPC chain ID before accepting results, deduplicates transaction/log pairs, caps graph edges and automatically retries smaller block windows when a provider rejects a range.
+- The graph is explicitly limited to Transfer-shaped logs returned by one provider. It does not include native transfers, internal calls, full wallet history, cross-chain hops, token legitimacy, ownership attribution or a risk verdict. A zero-result scan is not evidence of inactivity.
+
 ## Security model
 
 - Read-only public RPC calls only.
