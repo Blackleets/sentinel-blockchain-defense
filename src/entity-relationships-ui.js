@@ -7,7 +7,7 @@ import {renderEvidenceGapAnalysis} from "./evidence-gap-ui.js";
 import {renderInvestigationPlaybook} from "./investigation-playbook-ui.js";
 import {buildInvestigationIntelligence} from "./investigation-intelligence.js";
 import {investigationPlaybookStorageKey} from "./investigation-playbook.js";
-import {hypothesisLedgerStorageKey,reconcileHypothesisLedger,recordHypothesisAssessment} from "./hypothesis-ledger.js";
+import {hypothesisLedgerStorageKey,reconcileHypothesisLedger,recordHypothesisAssessment,mergeHypothesisLedgers} from "./hypothesis-ledger.js";
 import {compareInvestigationSnapshots} from "./investigation-snapshot-diff.js";
 import {buildInvestigationMarkdownReport} from "./investigation-report.js";
 import {createCaseVault,createIndexedDbCaseVaultStore} from "./case-vault.js";
@@ -111,6 +111,22 @@ function renderInvestigationIntelligence(container,inputs){
  const exportLedger=document.createElement("button");exportLedger.type="button";exportLedger.textContent="EXPORT HYPOTHESIS REVIEW LEDGER ↓";
  exportLedger.addEventListener("click",()=>exportSealedJson(ledger,"sentinel-hypothesis-ledger-"+ledger.subject.chainId+"-"+ledger.subject.address+"-sealed.json").catch(error=>{storageWarning=error.message;}));
  const warning=document.createElement("p");warning.className="sentinel-playbook-warning";warning.textContent=storageWarning||"Analyst assessments are stored locally in this browser. Export the ledger to preserve a portable copy.";
+ const importLedgerFile=document.createElement("input");importLedgerFile.type="file";importLedgerFile.accept="application/json,.json";importLedgerFile.setAttribute("aria-label","Import sealed hypothesis review ledger");
+ const importLedgerButton=document.createElement("button");importLedgerButton.type="button";importLedgerButton.textContent="IMPORT SEALED REVIEW LEDGER ↑";
+ importLedgerButton.addEventListener("click",async()=>{
+  const file=importLedgerFile.files?.[0];if(!file){warning.textContent="Select a sealed hypothesis review ledger first.";return;}
+  warning.textContent="Verifying imported analyst ledger…";
+  try{
+   const seal=JSON.parse(await file.text());
+   if(!await verifyEvidenceArtifactSeal(seal))throw new Error("Imported ledger SHA-256 seal is invalid. Import stopped.");
+   let local=ledger;try{const saved=JSON.parse(localStorage.getItem(storageKey)||"null");if(saved?.schema==="sentinel.hypothesis-ledger.v1")local=saved;}catch{}
+   const merged=mergeHypothesisLedgers({current:local,imported:seal.artifact,subject:inputs.neighborhood.subject,mergedAt:new Date().toISOString()});
+   localStorage.setItem(storageKey,JSON.stringify(merged.ledger));
+   renderInvestigationIntelligence(container,inputs);
+   const status=document.createElement("p");status.className="sentinel-playbook-warning";status.textContent="LEDGER IMPORT MERGED · "+merged.summary.addedEntries+" new hypothesis entries · "+merged.summary.addedAssessments+" new assessments · "+merged.summary.duplicateAssessments+" duplicates ignored · "+merged.summary.conflicts+" conflicts preserved without overwriting local history."; 
+   if(merged.conflicts.length){const detail=document.createElement("pre");detail.style.cssText="white-space:pre-wrap;overflow-wrap:anywhere;font-size:9px;color:#f6c879";detail.textContent=JSON.stringify(merged.conflicts,null,2);container.append(status,detail);}else container.appendChild(status);
+  }catch(error){warning.textContent="IMPORT REJECTED · "+error.message;warning.dataset.error="true";}
+ });
  const reportButton=document.createElement("button");reportButton.type="button";reportButton.textContent="EXPORT HUMAN-READABLE REPORT (.MD) ↓";
  reportButton.addEventListener("click",()=>{
   try{
@@ -210,7 +226,7 @@ function renderInvestigationIntelligence(container,inputs){
   finally{compareArchived.disabled=false;}
  });
  vaultPanel.append(vaultTitle,vaultDescription,vaultToolbar,savedSnapshots,compareArchived,vaultResult);
- container.append(metrics,assessment,hypotheses,timeline,caveat,warning,exportButton,exportLedger,reportButton,evolution,vaultPanel);
+ container.append(metrics,assessment,hypotheses,timeline,caveat,warning,exportButton,exportLedger,importLedgerFile,importLedgerButton,reportButton,evolution,vaultPanel);
 
 }
 
