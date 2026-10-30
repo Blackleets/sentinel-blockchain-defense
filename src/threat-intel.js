@@ -3,7 +3,9 @@ const DEFAULT_RULES = Object.freeze({
   repeatedRecipientMinCases: 2,
   sharedProxyMinCases: 2,
   upgradeBurstMinEvents: 2,
-  upgradeWindowBlocks: 7200
+  upgradeWindowBlocks: 7200,
+  transactionBurstMinEvents: 3,
+  transactionBurstWindowBlocks: 7200
 });
 
 function chainIdOf(report) {
@@ -49,6 +51,7 @@ export function analyzeThreatIntelligence(reports, overrides = {}) {
   const warnings = [];
   const grouped = new Map();
   const upgradesByChain = new Map();
+  const senderActivity = new Map();
 
   for (const report of validReports) {
     const chainId = chainIdOf(report);
@@ -71,6 +74,16 @@ export function analyzeThreatIntelligence(reports, overrides = {}) {
             blockNumber: observation.value.blockNumber || report.provenance?.blockNumber || null,
             address
           });
+          if (role === "sender") {
+            const rawBlock = observation.value.blockNumber || report.provenance?.blockNumber;
+            const block = typeof rawBlock === "string" && /^0x[0-9a-f]+$/i.test(rawBlock) ? BigInt(rawBlock) : null;
+            if (block === null) warnings.push({ caseSubject: subject, reason: "transaction-sender-event-missing-valid-block-number" });
+            else {
+              const activityKey = chainId + "|" + address;
+              if (!senderActivity.has(activityKey)) senderActivity.set(activityKey, []);
+              senderActivity.get(activityKey).push({ chainId, address, subject, blockNumber: block.toString(), transactionHash: observation.value.hash || null });
+            }
+          }
         }
         timelines.push({
           chainId,
@@ -146,6 +159,35 @@ export function analyzeThreatIntelligence(reports, overrides = {}) {
         cases, evidence: group.evidence,
         detail: { title: "Proxy infrastructure is reused across cases", description: "The same ERC-1967 slot address is referenced by distinct case reports on this chain. Shared infrastructure can be legitimate; review the role and context." }
       });
+    }
+  }
+
+  for (const events of senderActivity.values()) {
+    events.sort((a, b) => BigInt(a.blockNumber) < BigInt(b.blockNumber) ? -1 : BigInt(a.blockNumber) > BigInt(b.blockNumber) ? 1 : a.subject.localeCompare(b.subject));
+    let start = 0;
+    while (start < events.length) {
+      const first = BigInt(events[start].blockNumber);
+      let end = start;
+      while (end < events.length && BigInt(events[end].blockNumber) - first <= BigInt(rules.transactionBurstWindowBlocks)) end++;
+      const window = events.slice(start, end);
+      const distinctSubjects = unique(window.map(event => event.subject));
+      if (window.length >= rules.transactionBurstMinEvents && distinctSubjects.length >= 2) {
+        const last = BigInt(window[window.length - 1].blockNumber);
+        signals.push({
+          id: "transaction-sender-burst:" + window[0].chainId + ":" + window[0].address + ":" + first.toString(),
+          rule: "transaction-sender-burst",
+          chainId: window[0].chainId,
+          severity: "review",
+          confidence: "observed-pattern",
+          title: "Repeated sender activity in a bounded block window",
+          detail: "The same sender appears in multiple imported transaction observations across distinct cases inside the configured block window. This is a temporal recurrence, not attribution or proof of coordination.",
+          entities: [window[0].address],
+          caseSubjects: distinctSubjects,
+          window: { fromBlock: "0x" + first.toString(16), toBlock: "0x" + last.toString(16), maxBlocks: rules.transactionBurstWindowBlocks },
+          evidence: window.map(event => ({ ...event, blockNumber: "0x" + BigInt(event.blockNumber).toString(16) }))
+        });
+        start = end;
+      } else start++;
     }
   }
 
