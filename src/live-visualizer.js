@@ -174,6 +174,16 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
   const stats = panel.querySelector('[data-role="stats"]'), canvas = panel.querySelector('[data-role="canvas"]');
   const inspector = panel.querySelector('[data-role="inspector"]'), ledger = panel.querySelector('[data-role="ledger"]');
   let current = null, selected = null;
+  let tokenMetadata = new Map();
+  const renderNodeLedger = address => {
+    if (!current) return;
+    const visible = current.edges.filter(edge => edge.from === address || edge.to === address);
+    ledger.innerHTML = visible.length ? visible.slice().reverse().slice(0, 30).map(edge => {
+      const meta = tokenMetadata.get(edge.token) || {};
+      const amount = meta.decimals == null ? edge.amountRaw + " raw units" : formatTokenAmount(edge.amountRaw, meta.decimals);
+      return '<div class="sl-transfer"><div><code>' + esc(short(edge.from)) + ' → ' + esc(short(edge.to)) + '</code><small>Block ' + parseInt(edge.blockNumber,16).toLocaleString() + ' · ' + esc(meta.symbol || short(edge.token)) + ' · ' + esc(amount) + '</small></div><a href="' + esc(getNetwork().explorer) + '/tx/' + esc(edge.transactionHash) + '" target="_blank" rel="noopener noreferrer">View transaction ↗</a></div>';
+    }).join("") : '<div class="sl-empty-state">No matching Transfer events for this node in the scanned window.</div>';
+  };
   const showNode = address => {
     if (!current) return;
     selected = address;
@@ -181,6 +191,7 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
     const incoming = current.edges.filter(edge => edge.to === address), outgoing = current.edges.filter(edge => edge.from === address);
     inspector.innerHTML = '<span class="sl-kicker">NODE INSPECTOR</span><strong>'+esc(address)+'</strong><div class="sl-kv">Role<b>'+(node.origin?'Trace origin':'Observed counterparty')+'</b></div><div class="sl-kv">Incoming Transfer logs<b>'+incoming.length+'</b></div><div class="sl-kv">Outgoing Transfer logs<b>'+outgoing.length+'</b></div><div class="sl-kv">Token contracts observed<b>'+new Set([...incoming,...outgoing].map(edge=>edge.token)).size+'</b></div><a href="'+esc(getNetwork().explorer)+'/address/'+esc(address)+'" target="_blank" rel="noopener noreferrer">Open address in explorer ↗</a>';
     panel.querySelectorAll(".sl-node").forEach(el => el.classList.toggle("is-selected",el.dataset.address===address));
+    renderNodeLedger(address);
   };
   const render = graph => {
     current = graph; selected = graph.origin;
@@ -190,9 +201,9 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
       ['BLOCK WINDOW',graph.scannedFrom+' → '+graph.scannedTo]
     ].map(([label,value])=>'<span class="sl-stat"><b>'+esc(value)+'</b>'+esc(label)+'</span>').join('');
     const width=760,height=420,positions=new Map(graph.nodes.map((node,index)=>[node.address,point(index,graph.nodes.length,width,height)]));
-    const lines=graph.edges.map(edge=>{const a=positions.get(edge.from),b=positions.get(edge.to);return '<line class="sl-edge" x1="'+a.x+'" y1="'+a.y+'" x2="'+b.x+'" y2="'+b.y+'"><title>'+esc(edge.token)+' · '+esc(edge.transactionHash)+'</title></line>';}).join('');
+    const lines=graph.edges.map(edge=>{const a=positions.get(edge.from),b=positions.get(edge.to);return '<line class="sl-edge" marker-end="url(#sl-arrow)" x1="'+a.x+'" y1="'+a.y+'" x2="'+b.x+'" y2="'+b.y+'"><title>'+esc(edge.token)+' · '+esc(edge.transactionHash)+'</title></line>';}).join('');
     const nodes=graph.nodes.map((node,index)=>{const p=positions.get(node.address),radius=node.origin?13:Math.min(10,6+Math.log2(1+node.incomingCount+node.outgoingCount));return '<g class="sl-node'+(node.origin?' is-selected':'')+'" data-address="'+esc(node.address)+'" data-origin="'+node.origin+'" tabindex="0" role="button" aria-label="Inspect '+esc(node.address)+'"><circle cx="'+p.x+'" cy="'+p.y+'" r="'+radius+'"></circle><text x="'+p.x+'" y="'+(p.y+radius+14)+'">'+esc(short(node.address))+'</text></g>';}).join('');
-    canvas.innerHTML='<svg viewBox="0 0 '+width+' '+height+'" role="img" aria-label="Address transfer relationship graph">'+lines+nodes+'</svg>';
+    canvas.innerHTML='<svg viewBox="0 0 '+width+' '+height+'" role="img" aria-label="Address transfer relationship graph"><defs><marker id="sl-arrow" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#73dce9"></path></marker></defs>'+lines+nodes+'</svg>';
     canvas.querySelectorAll(".sl-node").forEach(el=>{const activate=()=>showNode(el.dataset.address);el.addEventListener("click",activate);el.addEventListener("keydown",event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();activate();}});});
     ledger.innerHTML=graph.edges.length?graph.edges.slice().reverse().slice(0,30).map(edge=>'<div class="sl-transfer"><div><code>'+esc(short(edge.from))+' → '+esc(short(edge.to))+'</code><small>Block '+parseInt(edge.blockNumber,16).toLocaleString()+' · '+esc(edge.token)+' · raw amount '+esc(edge.amountRaw)+'</small></div><a href="'+esc(getNetwork().explorer)+'/tx/'+esc(edge.transactionHash)+'" target="_blank" rel="noopener noreferrer">View transaction ↗</a></div>').join(''):'<div class="sl-empty-state">No Transfer-shaped logs were returned for this address in the scanned block window. This does not mean the address has no activity.</div>';
     if(graph.truncated)status.textContent+=' · Display capped at '+graph.edgeCount+' edges; '+graph.totalObservedEdges+' matched.';
@@ -222,6 +233,7 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
       const transfers=decodeTransferLogs(logs,{chainId:network.chainId});
       const from=latest>BigInt(windowBlocks)?latest-BigInt(windowBlocks):0n;
       const graph=buildLiveTransferGraph(transfers,{address,chainId:network.chainId,scannedFrom:from.toString(),scannedTo:latest.toString(),maxEdges:160});
+      tokenMetadata = await fetchMetadataBatch(graph.edges.map(edge => edge.token), rpc);
       render(graph);
       status.textContent=network.name+" · provider "+network.rpc+" · scanned "+windowBlocks.toLocaleString()+" blocks · queried "+new Date().toISOString();
     }catch(error){canvas.innerHTML='<div class="sl-empty sl-error">'+esc(error.message)+'</div>';status.textContent="Live trace failed. The provider may limit eth_getLogs range or availability.";status.classList.add("sl-error");}
