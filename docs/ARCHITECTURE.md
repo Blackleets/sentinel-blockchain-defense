@@ -49,6 +49,12 @@ Event definitions and slot semantics: [EIP-1967](https://eips.ethereum.org/EIPS/
 
 The bytecode analyzer now labels three known selector candidates: `proxiableUUID()` (`0x52d1902d`), `upgradeTo(address)` (`0x3659cfe6`) and `upgradeToAndCall(address,bytes)` (`0x4f1ef286`). These are discovered only when the selector bytes occur as PUSH4 immediates in the runtime bytecode. A selector candidate can be unreachable, embedded as data, or used for a different purpose; it is not proof that a function is externally callable, that the contract implements UUPS correctly, or that an upgrade path is exploitable. Confirmation requires control-flow analysis, storage/context validation, and authorization-path review.
 
+## Case evidence export (release 5)
+
+After a successful address or transaction inspection, the interface can export a JSON snapshot using the versioned `sentinel.case-report.v1` schema. Reports include the subject, subject type, chain ID, RPC provider, observation timestamp, block context, and structured observations returned by the read-only inspector. The report explicitly labels itself a point-in-time snapshot and sets interpretation to `not-assessed`; it does not claim safety, maliciousness, ownership or exploitability.
+
+The export is generated locally in the browser. SENTINEL does not upload or persist the case. A downloaded report is a user-held evidence artifact and should be treated as untrusted until independently verified against the referenced chain and provider.
+
 ## Planned modular architecture
 
 Future expansion should keep these domains separated:
