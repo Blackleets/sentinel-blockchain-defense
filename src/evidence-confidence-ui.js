@@ -3,13 +3,14 @@ import { buildEvidenceConfidenceAssessment } from "./evidence-confidence.js";
 
 const HASH = /^0x[0-9a-f]{64}$/i;
 const ADDRESS = /^0x[0-9a-f]{40}$/i;
-const STATUS_LABELS = { verified: "VERIFIED", conflicting: "CONFLICTING", unknown: "UNKNOWN" };
+const STATUS_LABELS = { verified: "CORROBORATED", conflicting: "DISCREPANCY", unknown: "UNVERIFIED" };
 const OVERALL_LABELS = {
-  corroborated: "CORROBORATED",
-  "partially-corroborated": "PARTIALLY CORROBORATED",
-  inconclusive: "INCONCLUSIVE",
-  conflicting: "CONFLICTING"
+  corroborated: "Corroborated",
+  "partially-corroborated": "Partially corroborated",
+  inconclusive: "Inconclusive",
+  conflicting: "Conflicting evidence"
 };
+const CHAIN_NAMES = { "0x1": "Ethereum", "0x38": "BNB Chain", "0x89": "Polygon" };
 
 function addReference(group, hash, entry = {}) {
   if (typeof hash !== "string" || !HASH.test(hash)) return;
@@ -29,10 +30,7 @@ function addReference(group, hash, entry = {}) {
   }
 }
 
-/**
- * Adapt the exported multi-case dossier into the single-chain input contract
- * used by the existing read-only RPC verifier. References remain chain-scoped.
- */
+/** Adapt an exported multi-case dossier into separate, chain-scoped RPC inputs. */
 export function buildSourceVerificationDossiers(dossier) {
   if (!dossier || dossier.schema !== "sentinel.investigation-dossier.v1" ||
       !Array.isArray(dossier.cases)) {
@@ -78,9 +76,7 @@ export function buildSourceVerificationDossiers(dossier) {
       if (observation?.kind === "erc1967-events") {
         for (const event of observation.events || []) {
           addReference(group, event?.transactionHash, {
-            kind: "upgrade-event",
-            blockNumber: event?.blockNumber,
-            logIndex: event?.logIndex
+            kind: "upgrade-event", blockNumber: event?.blockNumber, logIndex: event?.logIndex
           });
         }
       }
@@ -94,16 +90,12 @@ export function buildSourceVerificationDossiers(dossier) {
       kind: "observed-token-transfer-log",
       blockNumber: transfer.blockNumber,
       logIndex: transfer.logIndex,
-      record: {
-        from: transfer.from,
-        to: transfer.to,
-        evidence: { token: transfer.token, amountRaw: transfer.amountRaw }
-      }
+      record: { from: transfer.from, to: transfer.to,
+        evidence: { token: transfer.token, amountRaw: transfer.amountRaw } }
     });
   }
 
-  return [...groups.values()]
-    .filter(group => group.sourceReferences.length > 0)
+  return [...groups.values()].filter(group => group.sourceReferences.length > 0)
     .map(({ seen, ...group }) => group);
 }
 
@@ -115,15 +107,16 @@ function el(tag, className, text) {
 }
 
 function downloadAssessments(assessments) {
-  const blob = new Blob([JSON.stringify({
+  const bundle = {
     schema: "sentinel.evidence-confidence-bundle.v1",
     exportedAt: new Date().toISOString(),
     assessments
-  }, null, 2)], { type: "application/json" });
+  };
+  const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
+  const link = el("a");
   link.href = url;
-  link.download = "sentinel-evidence-confidence-" +
+  link.download = "sentinel-evidence-assessment-" +
     new Date().toISOString().replace(/[:.]/g, "-") + ".json";
   document.body.appendChild(link);
   link.click();
@@ -131,93 +124,132 @@ function downloadAssessments(assessments) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** Mount an explicitly user-triggered, read-only, multi-chain verification panel. */
+function renderAssessment(output, chainId, assessment, verification) {
+  const card = el("article", "ec-chain-card");
+  const header = el("div", "ec-chain-head");
+  const identity = el("div", "ec-chain-identity");
+  identity.append(
+    el("span", "ec-chain-kicker", "NETWORK"),
+    el("h3", "", CHAIN_NAMES[chainId] || "EVM chain " + chainId),
+    el("span", "ec-chain-id", "Chain ID " + chainId)
+  );
+  const state = el("span", "ec-overall ec-overall-" + assessment.assessment,
+    OVERALL_LABELS[assessment.assessment] || assessment.assessment);
+  header.append(identity, state);
+  card.appendChild(header);
+
+  const summary = assessment.summary;
+  const stats = el("div", "ec-stats");
+  [
+    ["Verified", summary.verifiedDimensions, "verified"],
+    ["Discrepancies", summary.conflictingDimensions, "conflicting"],
+    ["Unverified", summary.unknownDimensions, "unknown"]
+  ].forEach(([label, value, kind]) => {
+    const stat = el("div", "ec-stat ec-stat-" + kind);
+    stat.append(el("strong", "", value), el("span", "", label));
+    stats.appendChild(stat);
+  });
+  card.appendChild(stats);
+
+  const checks = el("div", "ec-checks");
+  for (const item of assessment.checks) {
+    const row = el("div", "ec-check ec-check-" + item.status);
+    const marker = el("span", "ec-check-marker", item.status === "verified" ? "✓" :
+      item.status === "conflicting" ? "!" : "—");
+    const body = el("div", "ec-check-body");
+    body.append(el("strong", "", item.label), el("p", "", item.detail));
+    if (item.references.length) {
+      body.appendChild(el("small", "ec-reference", item.references.length +
+        " transaction reference(s) linked"));
+    }
+    row.append(marker, body, el("span", "ec-check-status",
+      STATUS_LABELS[item.status] || item.status.toUpperCase()));
+    checks.appendChild(row);
+  }
+  card.appendChild(checks);
+
+  const meta = el("div", "ec-meta");
+  meta.append(
+    el("span", "", summary.checkedTransactions + " / " + summary.transactionReferences + " references checked"),
+    el("span", "", "RPC · " + (verification.providerName || "Configured provider")),
+    el("span", "", "Observed · " + (verification.observedAt || "timestamp unavailable"))
+  );
+  card.appendChild(meta);
+  output.appendChild(card);
+}
+
 export function mountEvidenceConfidencePanel(container, dossier) {
   if (!(container instanceof HTMLElement)) throw new TypeError("A DOM container is required");
   const sourceDossiers = buildSourceVerificationDossiers(dossier);
   container.querySelector("#evidence-confidence-panel")?.remove();
 
-  const panel = el("section", "notice");
+  const panel = el("section", "ec-panel");
   panel.id = "evidence-confidence-panel";
-  panel.style.marginTop = "16px";
-  panel.style.background = "linear-gradient(145deg,#101f2b,#0b151f)";
-  panel.style.borderColor = "#326176";
-  const heading = el("strong", "", "EVIDENCE CONFIDENCE ENGINE");
-  const description = el("p", "hint",
-    "Verify transaction references from imported cases against their configured read-only RPC endpoints. " +
-    "Each chain is assessed separately; no risk score or maliciousness verdict is generated.");
-  const actionRow = el("div", "graph-controls");
-  actionRow.style.marginTop = "12px";
-  const verifyButton = el("button", "", "Verify source references →");
+  const top = el("div", "ec-topline");
+  top.append(el("div", "ec-eyebrow", "EVIDENCE QUALITY / ENGINE 01"),
+    el("span", "ec-readonly", "● READ ONLY"));
+  const titleRow = el("div", "ec-title-row");
+  const titleBlock = el("div");
+  titleBlock.append(el("h2", "ec-title", "Evidence confidence"),
+    el("p", "ec-description", "Independent source checks for transaction references found in your imported investigation cases."));
+  titleRow.append(titleBlock, el("span", "ec-version", "MULTICHAIN"));
+  const context = el("div", "ec-context");
+  context.append(
+    el("span", "", sourceDossiers.length + " network group(s)"),
+    el("span", "", sourceDossiers.reduce((sum, item) => sum + item.sourceReferences.length, 0) + " transaction reference(s)"),
+    el("span", "", "No score · No verdict")
+  );
+  const controls = el("div", "ec-controls");
+  const verifyButton = el("button", "ec-run", "Run source verification");
   verifyButton.type = "button";
   verifyButton.disabled = sourceDossiers.length === 0;
-  const status = el("div", "hint", sourceDossiers.length
-    ? sourceDossiers.length + " chain group(s) · " +
-      sourceDossiers.reduce((sum, item) => sum + item.sourceReferences.length, 0) +
-      " transaction reference(s) ready. No RPC request has been made."
-    : "No verifiable transaction hashes were found in the imported cases.");
-  status.style.marginTop = "12px";
-  const output = el("div");
-  output.style.marginTop = "12px";
+  const status = el("p", "ec-status", sourceDossiers.length
+    ? "Ready. RPC requests only start when you run verification."
+    : "No verifiable transaction hashes found. Import case reports containing transaction references.");
+  const output = el("div", "ec-results");
+  const footer = el("div", "ec-limit",
+    "Interpretation boundary: a single RPC provider offers a point-in-time observation, not consensus or finality proof. A discrepancy is a review signal, not proof of malicious activity. UNKNOWN is not a clean result.");
+  controls.append(verifyButton);
+  panel.append(top, titleRow, context, controls, status, output, footer);
 
   verifyButton.addEventListener("click", async () => {
     verifyButton.disabled = true;
-    verifyButton.textContent = "Verifying against RPC…";
-    status.textContent = "Querying configured providers, separately for each chain.";
+    verifyButton.textContent = "Verifying source evidence…";
+    status.textContent = "Checking each chain against its configured read-only RPC endpoint.";
     output.replaceChildren();
     const assessments = [];
     const failures = [];
 
     for (const sourceDossier of sourceDossiers) {
+      const chainId = sourceDossier.subject.chainId;
       try {
         const verification = await verifyInvestigationDossierSources(sourceDossier);
         const assessment = buildEvidenceConfidenceAssessment(verification);
-        assessments.push({ chainId: sourceDossier.subject.chainId, assessment, verification });
-        const section = el("section", "graph-edge");
-        section.appendChild(el("b", "", "CHAIN " + sourceDossier.subject.chainId +
-          " · " + (OVERALL_LABELS[assessment.assessment] || assessment.assessment.toUpperCase())));
-        const summary = assessment.summary;
-        section.appendChild(el("small", "",
-          summary.verifiedDimensions + " verified · " + summary.conflictingDimensions +
-          " conflicting · " + summary.unknownDimensions + " unknown dimensions"));
-        for (const item of assessment.checks) {
-          const card = el("div", "kv");
-          card.appendChild(el("span", "", (STATUS_LABELS[item.status] || item.status.toUpperCase()) +
-            " · " + item.label));
-          card.appendChild(el("code", "", item.detail));
-          section.appendChild(card);
-        }
-        section.appendChild(el("small", "",
-          summary.checkedTransactions + " / " + summary.transactionReferences +
-          " transaction references checked · provider " + (verification.providerName || "configured RPC")));
-        output.appendChild(section);
+        assessments.push({ chainId, assessment, verification });
+        renderAssessment(output, chainId, assessment, verification);
       } catch (error) {
-        failures.push({ chainId: sourceDossier.subject.chainId, error: error?.message || "RPC failure" });
-        const failure = el("div", "graph-edge");
-        failure.appendChild(el("b", "", "CHAIN " + sourceDossier.subject.chainId + " · NOT VERIFIED"));
-        failure.appendChild(el("small", "", error?.message || "RPC verification failed"));
-        output.appendChild(failure);
+        failures.push({ chainId, error: error?.message || "RPC verification failed" });
+        const failed = el("article", "ec-chain-card ec-failed");
+        failed.append(el("strong", "", (CHAIN_NAMES[chainId] || "EVM chain " + chainId) + " · NOT VERIFIED"),
+          el("p", "", error?.message || "RPC verification failed. No positive assessment was produced."));
+        output.appendChild(failed);
       }
     }
 
     if (assessments.length) {
-      const exportButton = el("button", "", "Export evidence assessment JSON ↓");
+      const exportRow = el("div", "ec-export-row");
+      const exportButton = el("button", "ec-export", "Export assessment bundle ↓");
       exportButton.type = "button";
-      exportButton.style.marginTop = "12px";
       exportButton.addEventListener("click", () => downloadAssessments(assessments));
-      output.appendChild(exportButton);
+      exportRow.appendChild(exportButton);
+      output.appendChild(exportRow);
     }
-    output.appendChild(el("p", "hint",
-      "Limits: one RPC provider per chain; point-in-time block comparison; no consensus/finality proof, " +
-      "identity attribution, ownership inference or maliciousness verdict. UNKNOWN is not a clean result."));
-    status.textContent = assessments.length + " chain group(s) verified · " +
-      failures.length + " failed. Failed groups are not treated as clean.";
+    status.textContent = assessments.length + " network group(s) assessed · " +
+      failures.length + " not verified. Failed groups are not treated as clean.";
     verifyButton.disabled = false;
-    verifyButton.textContent = "Verify source references →";
+    verifyButton.textContent = "Run source verification again";
   });
 
-  actionRow.appendChild(verifyButton);
-  panel.append(heading, description, actionRow, status, output);
   container.appendChild(panel);
   return panel;
 }
