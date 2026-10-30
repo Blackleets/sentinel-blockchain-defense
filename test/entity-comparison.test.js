@@ -33,3 +33,20 @@ test("rejects invalid, identical and incomplete comparison inputs",()=>{
  assert.throws(()=>compareObservedEntities({graph,threatIntelligence,chainId:"0x1",addressA:"bad",addressB:b}),/valid EVM/);
  assert.throws(()=>compareObservedEntities({graph,threatIntelligence,chainId:"",addressA:a,addressB:b}),/chain ID/);
 });
+
+test("includes direct token receipt logs and adjacent handoff links",()=>{
+ const enriched={...threatIntelligence,tokenTransfers:[...threatIntelligence.tokenTransfers,{chainId:"0x1",from:a,to:b,transactionHash:"0x"+"3".repeat(64),amountRaw:"7"}],transactionLinks:[{chainId:"0x1",from:a,via:b,to:c,transactionHashes:[tx]}]};
+ const result=compareObservedEntities({graph,threatIntelligence:enriched,chainId:"0x1",addressA:a,addressB:b});
+ assert.equal(result.summary.directRelationshipCount,2);
+ assert.ok(result.directRelationships.some(item=>item.type==="observed-token-transfer-log"));
+ assert.ok(result.directRelationships.some(item=>item.type==="transaction-handoff"));
+});
+test("finds exact shared infrastructure metadata without implying control",()=>{
+ const infraGraph={schema:"sentinel.correlation-graph.v1",edges:[
+  {chainId:"0x1",from:a,to:c,type:"shared-erc1967-implementation",evidence:[{sharedAddress:d,role:"implementation"}]},
+  {chainId:"0x1",from:b,to:c,type:"shared-erc1967-implementation",evidence:[{sharedAddress:d,role:"implementation"}]}
+ ]};
+ const result=compareObservedEntities({graph:infraGraph,threatIntelligence,chainId:"0x1",addressA:a,addressB:b});
+ assert.deepEqual(result.sharedInfrastructure,[d]);
+ assert.ok(result.limitations.some(item=>item.includes("do not establish who controls")));
+});
