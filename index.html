@@ -86,11 +86,107 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 @media(max-width:850px){.shell{padding:18px}.hero{padding:35px 0 25px}.grid{grid-template-columns:1fr}.ec-panel{padding:18px}}
 @media(max-width:520px){.top{align-items:flex-start}.status{max-width:135px;text-align:center;line-height:1.5}.hero h1{font-size:36px}.panel{padding:17px}.ec-panel{padding:15px}.ec-stats{gap:6px}.ec-stat{padding:9px}.ec-check{grid-template-columns:23px minmax(0,1fr)}.ec-check-status{grid-column:2}.ec-context{gap:8px}.ec-context span+span:before{margin-right:7px}}
 
+
+/* SENTINEL responsive workspace system — desktop, tablet and mobile */
+.sentinel-nav{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:6px;margin:0 -2px;padding:10px 0 12px;border-bottom:1px solid rgba(43,70,88,.72);background:rgba(7,12,19,.9);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+.sentinel-nav a{display:inline-flex;align-items:center;gap:9px;padding:9px 13px;border:1px solid transparent;border-radius:9px;color:#9bb0c0;text-decoration:none;font-size:11px;font-weight:650;white-space:nowrap;transition:color .18s,border-color .18s,background .18s}
+.sentinel-nav a span{font:9px ui-monospace,monospace;color:#5e8294}
+.sentinel-nav a:hover,.sentinel-nav a:focus-visible{color:#e9faff;border-color:#31596a;background:#102330;outline:none}
+html{scroll-behavior:smooth;scroll-padding-top:76px}
+#lookup,#live-visualizer,#case-workspace{scroll-margin-top:78px}
+.shell{width:min(100%,1540px)}
+.panel,.ec-panel,.sentinel-live{min-width:0}
+.grid>*{min-width:0}
+input,select,button{max-width:100%}
+button{touch-action:manipulation}
+@media(max-width:850px){
+ .shell{padding:16px clamp(12px,3vw,22px)}
+ .sentinel-nav{margin:0 -2px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none}
+ .sentinel-nav::-webkit-scrollbar{display:none}
+ .sentinel-nav a{padding:9px 11px}
+ .grid{grid-template-columns:minmax(0,1fr)}
+ .stack{grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch}
+ .stack>.panel{min-width:0}
+ .hero{max-width:760px}
+}
+@media(max-width:600px){
+ body{font-size:13px}
+ .shell{padding:12px}
+ .top{align-items:center;gap:10px;padding-bottom:15px}
+ .brand{gap:10px;min-width:0}
+ .brand b{font-size:16px}
+ .brand small{font-size:8px;letter-spacing:.1em}
+ .mark{width:40px;height:40px;flex:0 0 40px}
+ .status{max-width:122px;padding:6px 8px;font-size:8px}
+ .sentinel-nav{gap:4px;padding:8px 0 10px}
+ .sentinel-nav a{font-size:10px;padding:8px 10px}
+ .sentinel-nav a span{display:none}
+ .hero{padding:27px 0 21px}
+ .hero h1{font-size:clamp(32px,9vw,42px);line-height:1.04}
+ .hero p{font-size:12px;line-height:1.7}
+ .eyebrow{font-size:9px;letter-spacing:.17em}
+ .grid{gap:12px}
+ .stack{grid-template-columns:1fr;gap:12px}
+ .panel{padding:15px;border-radius:14px}
+ .panel h2{font-size:14px}
+ .sub{font-size:11px;line-height:1.6;margin-bottom:14px}
+ .searchrow{display:grid;grid-template-columns:minmax(0,1fr);gap:9px}
+ .searchrow input,.searchrow select,.graph-controls input{width:100%;min-height:48px;font-size:16px}
+ .searchrow button{width:100%;min-height:48px}
+ .metric{gap:7px}
+ .metric div{padding:12px}
+ .metric strong{font-size:19px}
+ .metric small{font-size:10px}
+ .kv{grid-template-columns:minmax(88px,30%) minmax(0,1fr);gap:8px}
+ .kv code{font-size:11px}
+ .graph-controls{display:grid;grid-template-columns:minmax(0,1fr);gap:9px}
+ .graph-controls label{display:flex;justify-content:space-between;align-items:center;gap:10px}
+ .graph-controls label input{width:82px!important;min-height:40px;font-size:16px}
+ .graph-controls button{width:100%;min-height:46px}
+ .graph-summary{gap:6px}
+ .graph-summary span{font-size:10px;padding:7px 9px;overflow-wrap:anywhere}
+ .graph-edge{padding:10px}
+ .graph-edge code{font-size:10px}
+ .ec-panel{padding:14px;margin-top:12px;border-radius:14px}
+ .ec-title{font-size:20px}
+ .ec-description{font-size:11px}
+ .ec-stats{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+ .ec-stat{padding:8px 7px;min-width:0}
+ .ec-stat strong{font-size:18px}
+ .ec-stat span{font-size:9px;overflow-wrap:anywhere}
+ .ec-check{padding:9px;gap:8px}
+ .ec-check-body p{font-size:10px}
+ .ec-context{align-items:flex-start}
+ .ec-context span{font-size:9px}
+ .notice{font-size:10px;line-height:1.6}
+ .footer{font-size:10px;gap:8px}
+ .case-workspace{overflow:hidden}
+}
+@media(max-width:380px){
+ .shell{padding:9px}
+ .brand small{font-size:7px}
+ .status{max-width:104px;font-size:7px}
+ .hero h1{font-size:31px}
+ .ec-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .ec-check{grid-template-columns:21px minmax(0,1fr)}
+ .ec-check-status{grid-column:2}
+}
+@media(prefers-reduced-motion:reduce){
+ html{scroll-behavior:auto}
+ *,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}
+}
+
 </style>
 </head>
 <body><main class="shell">
 <header class="top"><div class="brand"><div class="mark">⌁</div><div><b>SENTINEL</b><small>BLOCKCHAIN DEFENSE INTELLIGENCE</small></div></div><div class="status">● SYSTEM READY · READ ONLY</div></header>
-<section class="hero"><div class="eyebrow">MULTICHAIN EVM SECURITY WORKSPACE</div><h1>See the signal.<br>Understand the risk.</h1><p>Inspect on-chain accounts, transactions and delegated code with transparent evidence. No wallet connection. No signatures. No funds movement.</p></section>
+<nav class="sentinel-nav" aria-label="Workspace navigation">
+  <a href="#workspace-home"><span>01</span> Overview</a>
+  <a href="#lookup"><span>02</span> Address search</a>
+  <a href="#live-visualizer"><span>03</span> Visualizer</a>
+  <a href="#case-workspace"><span>04</span> Investigations</a>
+</nav>
+<section class="hero" id="workspace-home"><div class="eyebrow">MULTICHAIN EVM SECURITY WORKSPACE</div><h1>See the signal.<br>Understand the risk.</h1><p>Inspect on-chain accounts, transactions and delegated code with transparent evidence. No wallet connection. No signatures. No funds movement.</p></section>
 <section class="grid">
 <div class="panel"><h2>On-chain inspector</h2><p class="sub">Enter an Ethereum address or transaction hash. Live reads are fetched from a public RPC endpoint.</p><form id="lookup" class="searchrow"><select id="network" aria-label="Select blockchain"><option value="ethereum">Ethereum Mainnet · ETH</option><option value="bnb">BNB Smart Chain · BNB</option><option value="polygon">Polygon PoS · POL</option></select><input id="target" autocomplete="off" spellcheck="false" placeholder="0x… address or transaction hash" aria-label="Blockchain address or transaction hash" required><button id="inspect" type="submit">Inspect →</button></form><div class="hint">Read-only RPC · Chain ID verified before inspection</div><div id="error" class="error" role="alert"></div><div id="result" class="result" aria-live="polite"></div></div>
 <aside class="stack">
@@ -98,7 +194,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 <div class="panel"><h2>Security principles</h2><div class="feed"><div class="feeditem"><b>Evidence before verdict</b><p>Every result is tied to RPC data and a block number where available.</p></div><div class="feeditem"><b>Delegation-aware</b><p>Detects the EIP-7702 designator prefix in account code.</p></div><div class="feeditem"><b>No transaction execution</b><p>Sentinel never requests private keys or signs transactions.</p></div></div></div>
 </aside></section>
 <section id="live-visualizer" aria-label="Live blockchain relationship visualizer"></section>
-<section class="panel" style="margin-top:16px"><h2>Investigation graph</h2><p class="sub">Import case evidence JSON files to correlate infrastructure and inspect recurring transaction patterns, proxy reuse and upgrade bursts. Configure thresholds below. Processing stays in this browser.</p><div class="graph-controls"><input id="case-files" type="file" accept=".json,application/json" multiple aria-label="Import SENTINEL case evidence JSON files"><button id="build-graph" type="button">Analyze evidence →</button></div><div class="graph-controls" style="margin-top:10px"><label class="hint">Repeated sender/recipient cases <input id="rule-repeat" type="number" min="1" max="100" value="2" style="width:64px"></label><label class="hint">Shared proxy cases <input id="rule-proxy" type="number" min="1" max="100" value="2" style="width:64px"></label><label class="hint">Upgrade events <input id="rule-upgrades" type="number" min="1" max="100" value="2" style="width:64px"></label><label class="hint">Upgrade window (blocks) <input id="rule-window" type="number" min="1" max="1000000" value="7200" style="width:90px"></label><label class="hint">Sender burst events <input id="rule-sender-burst" type="number" min="2" max="100" value="3" style="width:64px"></label><label class="hint">Sender burst window <input id="rule-sender-window" type="number" min="1" max="1000000" value="7200" style="width:90px"></label></div><div id="graph-error" class="error" role="alert"></div><div id="graph-output" aria-live="polite"><div class="empty">No cases loaded. Export evidence JSON from an inspection, then import two or more reports to find shared on-chain references.</div></div></section>
+<section class="panel case-workspace" id="case-workspace" style="margin-top:16px"><h2>Investigation graph</h2><p class="sub">Import case evidence JSON files to correlate infrastructure and inspect recurring transaction patterns, proxy reuse and upgrade bursts. Configure thresholds below. Processing stays in this browser.</p><div class="graph-controls"><input id="case-files" type="file" accept=".json,application/json" multiple aria-label="Import SENTINEL case evidence JSON files"><button id="build-graph" type="button">Analyze evidence →</button></div><div class="graph-controls" style="margin-top:10px"><label class="hint">Repeated sender/recipient cases <input id="rule-repeat" type="number" min="1" max="100" value="2" style="width:64px"></label><label class="hint">Shared proxy cases <input id="rule-proxy" type="number" min="1" max="100" value="2" style="width:64px"></label><label class="hint">Upgrade events <input id="rule-upgrades" type="number" min="1" max="100" value="2" style="width:64px"></label><label class="hint">Upgrade window (blocks) <input id="rule-window" type="number" min="1" max="1000000" value="7200" style="width:90px"></label><label class="hint">Sender burst events <input id="rule-sender-burst" type="number" min="2" max="100" value="3" style="width:64px"></label><label class="hint">Sender burst window <input id="rule-sender-window" type="number" min="1" max="1000000" value="7200" style="width:90px"></label></div><div id="graph-error" class="error" role="alert"></div><div id="graph-output" aria-live="polite"><div class="empty">No cases loaded. Export evidence JSON from an inspection, then import two or more reports to find shared on-chain references.</div></div></section>
 <div class="notice">Early release: this inspector is a defensive research aid, not an audit or guarantee of safety. A delegation marker alone does not prove malicious intent.</div>
 <footer class="footer"><span> S E N T I N E L &nbsp; / &nbsp; SECURITY RESEARCH</span><span id="clock">Waiting for first query</span></footer>
 </main>
