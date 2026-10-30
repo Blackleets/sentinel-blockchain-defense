@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {createCaseVault,createCaseVaultRecord} from "../src/case-vault.js";
+import {createCaseVault,createCaseVaultRecord,createIndexedDbCaseVaultStore} from "../src/case-vault.js";
 const subject={chainId:"0x1",address:"0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"};
 const dossier={schema:"sentinel.investigation-intelligence.v1",caseId:"case-1",generatedAt:"2026-10-30T12:00:00.000Z",subject};
 const seal={schema:"sentinel.evidence-integrity-seal.v1",algorithm:"SHA-256",canonicalization:"sorted-object-keys-v1",digest:"a".repeat(64),artifact:dossier};
@@ -62,4 +62,32 @@ test("rejects a backup with a tampered inner dossier seal before writing records
  const backupSeal={schema:"sentinel.evidence-integrity-seal.v1",algorithm:"SHA-256",canonicalization:"sorted-object-keys-v1",digest:"b".repeat(64),artifact:backup};
  await assert.rejects(()=>vault.importBackup(backupSeal),/inner integrity check/);
  assert.equal((await store.getAll()).length,0);
+});
+
+test("IndexedDB adapter resolves missing records as undefined rather than leaking request objects",async()=>{
+ const records=new Map();
+ const indexedDB={open(){
+  const request={};
+  queueMicrotask(()=>{
+   const db={objectStoreNames:{contains:()=>true},transaction(){
+    const tx={objectStore:()=>({
+     add(record){const req={};queueMicrotask(()=>{records.set(record.id,structuredClone(record));req.result=record.id;tx.oncomplete?.();});return req;},
+     get(id){const req={};queueMicrotask(()=>{req.result=records.get(id);tx.oncomplete?.();});return req;},
+     getAll(){const req={};queueMicrotask(()=>{req.result=[...records.values()];tx.oncomplete?.();});return req;}
+    })};
+    return tx;
+   }};
+   request.result=db;request.onsuccess?.();
+  });
+  return request;
+ }};
+ const store=createIndexedDbCaseVaultStore({indexedDB,databaseName:"test-vault"});
+ assert.equal(await store.get("missing"),undefined);
+ const record=createCaseVaultRecord(seal,{savedAt:"2026-10-30T12:01:00.000Z"});
+ await store.add(record);
+ assert.equal((await store.get(record.id)).id,record.id);
+ assert.equal((await store.getAll()).length,1);
+});
+test("IndexedDB adapter fails clearly when browser storage is unavailable",()=>{
+ assert.throws(()=>createIndexedDbCaseVaultStore({indexedDB:null}),/IndexedDB is unavailable/);
 });
