@@ -118,6 +118,8 @@ function renderInvestigationIntelligence(container,inputs){
    let latestLedger=ledger;
    try{const saved=JSON.parse(localStorage.getItem(storageKey)||"null");if(saved?.schema==="sentinel.hypothesis-ledger.v1")latestLedger=saved;}catch{}
    const latest=buildInvestigationIntelligence({...inputs,playbook:latestPlaybook,hypothesisLedger:latestLedger,generatedAt:new Date().toISOString()});
+   const validation=validateInvestigationDossier(latest);
+   if(!validation.valid)throw new Error("Dossier structure invalid: "+validation.errors.join(" · "));
    const markdown=buildInvestigationMarkdownReport(latest);
    exportText(markdown,"sentinel-investigation-report-"+latest.subject.chainId+"-"+latest.subject.address+".md");
   }catch(error){const note=document.createElement("p");note.className="sentinel-playbook-warning";note.dataset.error="true";note.textContent=error.message;container.appendChild(note);}
