@@ -27,15 +27,15 @@ function validate(snapshot,label){
 }
 function compareGroupedEvidence(previous,current){
  const before=groupBy(previous.timeline,eventKey),after=groupBy(current.timeline,eventKey);
- const added=[],retained=[],notInCurrentSnapshot=[];
+ const added=[],retained=[],notInCurrentSnapshot=[],matchedCounts=new Map();
  for(const [key,currentItems] of after){
   const previousItems=[...(before.get(key)||[])];
   for(const item of currentItems){
-   if(previousItems.length){const old=previousItems.shift();retained.push({key,previous:clone(old),current:clone(item),recordChanged:stable(old.record)!==stable(item.record)});}
+   if(previousItems.length){const old=previousItems.shift();matchedCounts.set(key,(matchedCounts.get(key)||0)+1);retained.push({key,previous:clone(old),current:clone(item),recordChanged:stable(old.record)!==stable(item.record)});}
    else added.push(clone(item));
   }
  }
- for(const [key,items] of before)for(const item of items)if(!(after.get(key)||[]).some((candidate,index)=>candidate===item))notInCurrentSnapshot.push(clone(item));
+ for(const [key,items] of before)for(const item of items.slice(matchedCounts.get(key)||0))notInCurrentSnapshot.push(clone(item));
  return {added,retained,notInCurrentSnapshot};
 }
 function compareWorkflow(previous,current){
