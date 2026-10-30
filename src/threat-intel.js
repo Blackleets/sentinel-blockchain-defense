@@ -67,7 +67,7 @@ export function analyzeThreatIntelligence(reports, overrides = {}) {
           group.cases.add(caseKey);
           group.evidence.push({
             caseSubject: subject,
-            transactionHash: observation.value.hash || report.subject,
+            transactionHash: observation.value.hash || null,
             blockNumber: observation.value.blockNumber || report.provenance?.blockNumber || null,
             address
           });
@@ -77,7 +77,7 @@ export function analyzeThreatIntelligence(reports, overrides = {}) {
           kind: "transaction",
           subject,
           blockNumber: observation.value.blockNumber || report.provenance?.blockNumber || null,
-          transactionHash: observation.value.hash || report.subject,
+          transactionHash: observation.value.hash || null,
           from: addressOf(observation.value.from),
           to: addressOf(observation.value.to)
         });
@@ -151,26 +151,33 @@ export function analyzeThreatIntelligence(reports, overrides = {}) {
 
   for (const [chainId, events] of upgradesByChain) {
     events.sort((a, b) => BigInt(a.blockNumber) < BigInt(b.blockNumber) ? -1 : BigInt(a.blockNumber) > BigInt(b.blockNumber) ? 1 : a.subject.localeCompare(b.subject));
-    for (let start = 0; start < events.length; start++) {
+    let start = 0;
+    while (start < events.length) {
       const first = BigInt(events[start].blockNumber);
-      const window = events.slice(start).filter(event => BigInt(event.blockNumber) - first <= BigInt(rules.upgradeWindowBlocks));
+      let end = start;
+      while (end < events.length && BigInt(events[end].blockNumber) - first <= BigInt(rules.upgradeWindowBlocks)) end++;
+      const window = events.slice(start, end);
       const distinctSubjects = unique(window.map(event => event.subject));
-      if (window.length < rules.upgradeBurstMinEvents || distinctSubjects.length < 2) continue;
-      const evidence = window.map(event => ({ ...event, blockNumber: "0x" + BigInt(event.blockNumber).toString(16) }));
-      signals.push({
-        id: "upgrade-burst:" + chainId + ":" + first.toString(),
-        rule: "upgrade-burst",
-        chainId,
-        severity: "review",
-        confidence: "observed-pattern",
-        title: "Multiple proxy upgrades in a bounded block window",
-        detail: "Distinct case subjects have ERC-1967 Upgraded events within the configured block window. This temporal cluster merits review but does not establish a coordinated or malicious event.",
-        entities: distinctSubjects,
-        caseSubjects: distinctSubjects,
-        window: { fromBlock: "0x" + first.toString(16), toBlock: "0x" + BigInt(window[window.length - 1].blockNumber).toString(16), maxBlocks: rules.upgradeWindowBlocks },
-        evidence
-      });
-      break;
+      if (window.length >= rules.upgradeBurstMinEvents && distinctSubjects.length >= 2) {
+        const last = BigInt(window[window.length - 1].blockNumber);
+        const evidence = window.map(event => ({ ...event, blockNumber: "0x" + BigInt(event.blockNumber).toString(16) }));
+        signals.push({
+          id: "upgrade-burst:" + chainId + ":" + first.toString() + ":" + last.toString(),
+          rule: "upgrade-burst",
+          chainId,
+          severity: "review",
+          confidence: "observed-pattern",
+          title: "Multiple proxy upgrades in a bounded block window",
+          detail: "Distinct case subjects have ERC-1967 Upgraded events within the configured block window. This temporal cluster merits review but does not establish a coordinated or malicious event.",
+          entities: distinctSubjects,
+          caseSubjects: distinctSubjects,
+          window: { fromBlock: "0x" + first.toString(16), toBlock: "0x" + last.toString(16), maxBlocks: rules.upgradeWindowBlocks },
+          evidence
+        });
+        start = end;
+      } else {
+        start++;
+      }
     }
   }
 
