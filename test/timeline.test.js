@@ -60,6 +60,7 @@ test("rejects malformed filters and ignores malformed observations", () => {
   assert.throws(() => buildEvidenceTimeline([], { address: "bad" }), /valid EVM address/);
   assert.throws(() => buildEvidenceTimeline([], { fromBlock: "bad" }), /block number/);
   assert.throws(() => buildEvidenceTimeline([], { maxEvents: 1001 }), /between 1 and 1000/);
-  const result = buildEvidenceTimeline([report(hash(1), "0x1", [{ kind: "transaction", value: { from: "bad", to: b } }])]);
+  const malformed = report("0x9999999999999999999999999999999999999999", "0x1", [{ kind: "transaction", value: { from: "bad", to: b } }], { subjectType: "address", provenance: { blockNumber: null } });
+  const result = buildEvidenceTimeline([malformed]);
   assert.equal(result.includedEventCount, 0);
 });
