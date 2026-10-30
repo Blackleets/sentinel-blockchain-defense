@@ -48,9 +48,9 @@ This is an early functional foundation, not a complete smart-contract audit plat
 1. Add configurable RPC providers, provider health checks and network-specific explorer links.
 2. Add EIP-7702 history and authorization analysis with clearly sourced evidence.
 3. Expand proxy intelligence beyond ERC-1967 and add verified-contract metadata and historical context.
-4. Add explainable risk indicators with evidence links and confidence boundaries.
-5. Add forensic timelines, exportable case reports and safe local threat simulations.
-6. Add automated tests, CI and deployment hardening.
+4. Add indexed historical transaction tracing, persistence controls and alert delivery.
+5. Add richer case timelines and safe local threat simulations.
+6. Add browser-level verification, deployment hardening and independent RPC cross-checks.
 
 ## Development principles
 
