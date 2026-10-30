@@ -76,10 +76,13 @@ test("finds bounded directed paths only within the same chain and token", () => 
     transfer(b, c, "0x13", "0x1", "d", { token: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" })
   ]);
   const result = findObservedTokenPaths(graph, { from: a, to: c, maxHops: 3 });
-  assert.equal(result.pathCount, 1);
-  assert.equal(result.paths[0].hopCount, 2);
-  assert.deepEqual(result.paths[0].addresses, [a, b, c]);
-  assert.equal(result.paths[0].edges[0].transactionHash, tx("a"));
+  assert.equal(result.pathCount, 2);
+  const twoHopPath = result.paths.find(path => path.chainId === "0x1");
+  const alternateChainPath = result.paths.find(path => path.chainId === "0x38");
+  assert.equal(twoHopPath.hopCount, 2);
+  assert.deepEqual(twoHopPath.addresses, [a, b, c]);
+  assert.equal(twoHopPath.edges[0].transactionHash, tx("a"));
+  assert.equal(alternateChainPath.hopCount, 1);
   assert.match(result.limitation, /does not prove/);
 });
 
