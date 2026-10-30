@@ -320,6 +320,52 @@ export function analyzeThreatIntelligence(reports, overrides = {}) {
     (BigInt(a.logIndex) < BigInt(b.logIndex) ? -1 : BigInt(a.logIndex) > BigInt(b.logIndex) ? 1 : 0)
   );
 
+  const tokenProfileMap = new Map();
+  const ensureTokenProfile = (transfer, address) => {
+    const key = transfer.chainId + "|" + transfer.token + "|" + address;
+    if (!tokenProfileMap.has(key)) tokenProfileMap.set(key, {
+      chainId: transfer.chainId, token: transfer.token, address,
+      incomingCount: 0, outgoingCount: 0, incomingRaw: 0n, outgoingRaw: 0n,
+      counterparties: new Set(), cases: new Set(), firstSeenBlock: null, lastSeenBlock: null
+    });
+    return tokenProfileMap.get(key);
+  };
+  for (const transfer of tokenTransfers) {
+    const block = BigInt(transfer.blockNumber);
+    const amount = BigInt(transfer.amountRaw);
+    const sender = ensureTokenProfile(transfer, transfer.from);
+    const recipient = ensureTokenProfile(transfer, transfer.to);
+    sender.outgoingCount++;
+    sender.outgoingRaw += amount;
+    recipient.incomingCount++;
+    recipient.incomingRaw += amount;
+    sender.counterparties.add(transfer.to);
+    recipient.counterparties.add(transfer.from);
+    sender.cases.add(transfer.caseSubject);
+    recipient.cases.add(transfer.caseSubject);
+    for (const profile of [sender, recipient]) {
+      if (profile.firstSeenBlock === null || block < BigInt(profile.firstSeenBlock)) profile.firstSeenBlock = "0x" + block.toString(16);
+      if (profile.lastSeenBlock === null || block > BigInt(profile.lastSeenBlock)) profile.lastSeenBlock = "0x" + block.toString(16);
+    }
+  }
+  const tokenAddressProfiles = [...tokenProfileMap.values()].map(profile => ({
+    chainId: profile.chainId,
+    token: profile.token,
+    address: profile.address,
+    incomingTransferCount: profile.incomingCount,
+    outgoingTransferCount: profile.outgoingCount,
+    incomingAmountRaw: profile.incomingRaw.toString(),
+    outgoingAmountRaw: profile.outgoingRaw.toString(),
+    uniqueCounterpartyCount: profile.counterparties.size,
+    counterparties: [...profile.counterparties].sort(),
+    distinctCaseCount: profile.cases.size,
+    caseSubjects: [...profile.cases].sort(),
+    firstSeenBlock: profile.firstSeenBlock,
+    lastSeenBlock: profile.lastSeenBlock,
+    amountUnit: "raw-token-base-units",
+    coverage: "imported-receipt-logs-only"
+  })).sort((a, b) => (b.incomingTransferCount + b.outgoingTransferCount) - (a.incomingTransferCount + a.outgoingTransferCount) || a.chainId.localeCompare(b.chainId) || a.token.localeCompare(b.token) || a.address.localeCompare(b.address));
+
   const addressProfiles = [...profileMap.values()].map(profile => ({
     chainId: profile.chainId,
     address: profile.address,
@@ -379,6 +425,7 @@ export function analyzeThreatIntelligence(reports, overrides = {}) {
     transactionLinks,
     addressProfiles,
     tokenTransfers,
+    tokenAddressProfiles,
     warnings,
     assessment: {
       verdict: "not-assessed",
