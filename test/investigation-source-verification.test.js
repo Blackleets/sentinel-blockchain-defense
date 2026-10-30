@@ -77,3 +77,11 @@ test("checks transaction-flow endpoints against the RPC transaction",async()=>{
  assert.equal(result.summary.evidenceMismatches,1);
  assert.ok(result.results[0].evidenceChecks[0].problems.includes("transaction-recipient-does-not-match-observed-flow"));
 });
+
+test("does not call an uncorroborated hash-only timeline reference a matched evidence check",async()=>{
+ const data=dossier();data.timeline=[{kind:"observation",chainId:"0x1",blockNumber:null,transactionHash:txHash,logIndex:null,source:"imported-reference",record:{}}];
+ const result=await verifyInvestigationDossierSources(data,{fetchImpl:mockFetch().fetchImpl});
+ assert.equal(result.summary.matchedEvidenceChecks,0);
+ assert.equal(result.summary.notCheckableEvidenceChecks,1);
+ assert.equal(result.results[0].evidenceChecks[0].status,"not-checkable");
+});
