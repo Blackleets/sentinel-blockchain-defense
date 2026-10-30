@@ -456,6 +456,21 @@ button,input,select{font:inherit}
     <footer class="footer"><span>SENTINEL / SECURITY RESEARCH</span><span id="clock">AWAITING FIRST QUERY</span></footer>
   </main>
 </div>
+<script>
+(() => {
+  const links = [...document.querySelectorAll(".side-link")];
+  const targets = links.map(link => document.querySelector(link.getAttribute("href"))).filter(Boolean);
+  const activate = id => links.forEach(link => link.classList.toggle("active", link.getAttribute("href") === "#" + id));
+  links.forEach(link => link.addEventListener("click", () => activate(link.getAttribute("href").slice(1))));
+  if ("IntersectionObserver" in window) {
+    const observer = new IntersectionObserver(entries => {
+      const visible = entries.filter(entry => entry.isIntersecting).sort((a,b) => b.intersectionRatio-a.intersectionRatio)[0];
+      if (visible) activate(visible.target.id);
+    }, {rootMargin:"-18% 0px -68% 0px",threshold:[0,.15,.35]});
+    targets.forEach(target => observer.observe(target));
+  }
+})();
+</script>
 <script type="module">
 import { inspectDelegationCode } from "./src/eip7702.js";
 import { analyzeBytecode } from "./src/bytecode.js";
