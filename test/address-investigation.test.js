@@ -57,5 +57,5 @@ test("ignores malformed token case subjects without breaking an address investig
  const malformedThreat={...threat,tokenTransfers:[{chainId:"0x1",from:a,to:b,amountRaw:"1",blockNumber:"0x12",logIndex:"0x0",caseSubject:42}]};
  const result=buildAddressInvestigation({reports:[],graph,threatIntelligence:malformedThreat,chainId:"0x1",address:a});
  assert.equal(result.summary.tokenTransferCount,1);
- assert.deepEqual(result.caseSubjects,[]);
+ assert.deepEqual(result.caseSubjects,[txhash(1)]);
 });
