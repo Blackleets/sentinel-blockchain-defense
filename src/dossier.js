@@ -19,7 +19,8 @@ export function buildInvestigationDossier({ reports, graph, threatIntelligence, 
       threatSignalCount: threatIntelligence.signalCount,
       transactionHandoffCount: threatIntelligence.transactionLinks?.length ?? 0,
       addressProfileCount: threatIntelligence.addressProfiles?.length ?? 0,
-      decodedTokenTransferCount: threatIntelligence.tokenTransfers?.length ?? 0
+      decodedTokenTransferCount: threatIntelligence.tokenTransfers?.length ?? 0,
+      tokenAddressProfileCount: threatIntelligence.tokenAddressProfiles?.length ?? 0
     },
     sourceFiles: [...sourceFiles],
     cases: reports,
