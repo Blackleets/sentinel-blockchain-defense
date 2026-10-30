@@ -52,6 +52,7 @@ export function analyzeThreatIntelligence(reports, overrides = {}) {
   const grouped = new Map();
   const upgradesByChain = new Map();
   const senderActivity = new Map();
+  const transactionObservations = [];
 
   for (const report of validReports) {
     const chainId = chainIdOf(report);
@@ -91,6 +92,15 @@ export function analyzeThreatIntelligence(reports, overrides = {}) {
           subject,
           blockNumber: observation.value.blockNumber || report.provenance?.blockNumber || null,
           transactionHash: observation.value.hash || null,
+          from: addressOf(observation.value.from),
+          to: addressOf(observation.value.to)
+        });
+        transactionObservations.push({
+          chainId,
+          subject,
+          transactionHash: typeof observation.value.hash === "string" ? observation.value.hash.toLowerCase() : null,
+          blockNumber: typeof observation.value.blockNumber === "string" && /^0x[0-9a-f]+$/i.test(observation.value.blockNumber) ? observation.value.blockNumber.toLowerCase() : null,
+          transactionIndex: typeof observation.value.transactionIndex === "string" && /^0x[0-9a-f]+$/i.test(observation.value.transactionIndex) ? observation.value.transactionIndex.toLowerCase() : null,
           from: addressOf(observation.value.from),
           to: addressOf(observation.value.to)
         });
@@ -232,6 +242,46 @@ export function analyzeThreatIntelligence(reports, overrides = {}) {
     return left < right ? -1 : left > right ? 1 : 0;
   });
 
+
+  const deduplicatedTransactions = new Map();
+  for (const tx of transactionObservations) {
+    if (!tx.transactionHash || !tx.from || !tx.to || !tx.blockNumber) continue;
+    const key = tx.chainId + "|" + tx.transactionHash;
+    if (!deduplicatedTransactions.has(key)) deduplicatedTransactions.set(key, tx);
+  }
+  const orderedTransactions = [...deduplicatedTransactions.values()].sort((a, b) => {
+    if (a.chainId !== b.chainId) return a.chainId.localeCompare(b.chainId);
+    const blockA = BigInt(a.blockNumber), blockB = BigInt(b.blockNumber);
+    if (blockA !== blockB) return blockA < blockB ? -1 : 1;
+    if (a.transactionIndex && b.transactionIndex) {
+      const indexA = BigInt(a.transactionIndex), indexB = BigInt(b.transactionIndex);
+      if (indexA !== indexB) return indexA < indexB ? -1 : 1;
+    }
+    return (a.transactionHash || "").localeCompare(b.transactionHash || "");
+  });
+  const transactionLinks = [];
+  for (let i = 0; i < orderedTransactions.length; i++) {
+    const first = orderedTransactions[i];
+    for (let j = i + 1; j < orderedTransactions.length; j++) {
+      const next = orderedTransactions[j];
+      if (next.chainId !== first.chainId) {
+        if (next.chainId > first.chainId) break;
+        continue;
+      }
+      if (BigInt(next.blockNumber) - BigInt(first.blockNumber) > BigInt(rules.transactionBurstWindowBlocks)) break;
+      if (first.to !== next.from) continue;
+      transactionLinks.push({
+        chainId: first.chainId,
+        from: first.from,
+        via: first.to,
+        to: next.to,
+        firstTransaction: { hash: first.transactionHash, blockNumber: first.blockNumber, caseSubject: first.subject },
+        nextTransaction: { hash: next.transactionHash, blockNumber: next.blockNumber, caseSubject: next.subject },
+        interpretation: "observed-transaction-handoff"
+      });
+    }
+  }
+
   return {
     schema: "sentinel.threat-intelligence.v1",
     reportCount: validReports.length,
@@ -239,6 +289,7 @@ export function analyzeThreatIntelligence(reports, overrides = {}) {
     signalCount: signals.length,
     signals: signals.sort((a, b) => a.chainId.localeCompare(b.chainId) || a.rule.localeCompare(b.rule) || a.id.localeCompare(b.id)),
     timeline: timelines,
+    transactionLinks,
     warnings,
     assessment: {
       verdict: "not-assessed",
