@@ -126,7 +126,7 @@ export function buildAddressInvestigation({ reports, graph, threatIntelligence, 
     item.chainId === selectedChain && (item.from === selectedAddress || item.to === selectedAddress)
   ).map(item => {
     relatedAddresses.add(item.from); relatedAddresses.add(item.to);
-    if (item.caseSubject) caseSubjects.add(item.caseSubject.toLowerCase());
+    if (typeof item.caseSubject === "string" && item.caseSubject) caseSubjects.add(item.caseSubject.toLowerCase());
     addBlock(item.blockNumber);
     return { ...item, direction: item.from === selectedAddress && item.to === selectedAddress ? "self" : item.from === selectedAddress ? "outgoing" : "incoming" };
   }).sort((a, b) => {
@@ -154,11 +154,12 @@ export function buildAddressInvestigation({ reports, graph, threatIntelligence, 
     for (const subject of edge.evidence?.flatMap(item => item.caseSubjects || []) || []) caseSubjects.add(subject);
   }
 
-  const threatSignals = (threatIntelligence.signals || []).filter(signal => signal.chainId === selectedChain &&
-    (signal.entities || []).includes(selectedAddress) || signal.chainId === selectedChain && (signal.evidence || []).some(item =>
+  const threatSignals = (threatIntelligence.signals || []).filter(signal => signal.chainId === selectedChain && (
+    (signal.entities || []).includes(selectedAddress) || (signal.evidence || []).some(item =>
       item.address === selectedAddress || item.from === selectedAddress || item.to === selectedAddress ||
       item.implementation === selectedAddress
-    ));
+    )
+  ));
   const addressProfile = (threatIntelligence.addressProfiles || []).find(profile => profile.chainId === selectedChain && profile.address === selectedAddress) || null;
   const tokenProfiles = (threatIntelligence.tokenAddressProfiles || []).filter(profile => profile.chainId === selectedChain && profile.address === selectedAddress);
   relatedAddresses.delete(selectedAddress);
