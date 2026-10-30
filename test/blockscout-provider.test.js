@@ -34,7 +34,7 @@ test("normalizes paginated Blockscout ERC-20 records and keeps exact base units"
 test("deduplicates direction overlap and excludes malformed or non-ERC20 records",async()=>{
  const bad=item({token_type:"ERC-721"});
  const invalid=item({from:{hash:"not-an-address"}});
- const result=await fetchBlockscoutAddressTransfers({address,chainId:"0x1",fetchImpl:async()=>response([item(),item(),bad,invalid])});
+ const result=await fetchBlockscoutAddressTransfers({address,chainId:"0x1",fetchImpl:async url=>new URL(url).searchParams.get("filter")==="from"?response([item(),item(),bad]):response([item(),invalid])});
  assert.equal(result.transfers.length,1);
  assert.equal(result.malformedItems,2);
 });
