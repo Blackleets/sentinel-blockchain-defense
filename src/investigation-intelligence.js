@@ -35,7 +35,7 @@ function sortTimeline(entries){
  * Assemble a reproducible analyst dossier from the exact bounded inputs already
  * displayed by the Entity Relationship Explorer. No network enrichment occurs.
  */
-export function buildInvestigationIntelligence({neighborhood,graph,threatIntelligence,gapAnalysis,playbook,generatedAt=new Date().toISOString(),caseId}){
+export function buildInvestigationIntelligence({neighborhood,graph,threatIntelligence,gapAnalysis,playbook,hypothesisLedger,generatedAt=new Date().toISOString(),caseId}){
  if(!neighborhood||neighborhood.schema!=="sentinel.entity-neighborhood.v1")throw new TypeError("A SENTINEL entity neighborhood is required");
  if(!graph||graph.schema!=="sentinel.correlation-graph.v1")throw new TypeError("A SENTINEL correlation graph is required");
  if(!threatIntelligence||threatIntelligence.schema!=="sentinel.threat-intelligence.v1")throw new TypeError("SENTINEL threat intelligence is required");
@@ -107,6 +107,7 @@ export function buildInvestigationIntelligence({neighborhood,graph,threatIntelli
   why:"No specialized hypothesis rule was triggered by the supplied neighborhood.",
   verification:"Import additional independently sourced case reports, transaction receipts and historical context before drawing conclusions.",
   references:[]});
+ if(hypothesisLedger&&(hypothesisLedger.schema!=="sentinel.hypothesis-ledger.v1"||hypothesisLedger.subject?.chainId!==subject.chainId||hypothesisLedger.subject?.address!==subject.address))throw new TypeError("Hypothesis ledger subject does not match the investigation subject");
  const taskSummary={total:playbook.tasks.length,pending:playbook.tasks.filter(task=>task.status==="pending").length,
   inProgress:playbook.tasks.filter(task=>task.status==="in-progress").length,verifiedByAnalyst:playbook.tasks.filter(task=>task.status==="verified").length,
   notApplicable:playbook.tasks.filter(task=>task.status==="not-applicable").length};
@@ -125,8 +126,9 @@ export function buildInvestigationIntelligence({neighborhood,graph,threatIntelli
   assessment:{verdict:"not-assessed",riskScore:null},
   summary:{entityCount:(neighborhood.nodes||[]).length,relationshipCount:(neighborhood.edges||[]).length,
    timelineEntryCount:orderedTimeline.length,hypothesisCount:hypotheses.length,sourceReferenceCount:sourceRefs.length,
+   hypothesisReview:hypothesisLedger?{total:hypothesisLedger.entries.length,open:hypothesisLedger.entries.filter(item=>item.status==="open").length,supported:hypothesisLedger.entries.filter(item=>item.status==="supported").length,notSupported:hypothesisLedger.entries.filter(item=>item.status==="not-supported").length,inconclusive:hypothesisLedger.entries.filter(item=>item.status==="inconclusive").length,assessmentCount:hypothesisLedger.entries.reduce((sum,item)=>sum+item.assessments.length,0)}:null,
    neighborhoodTruncated:Boolean(neighborhood.summary?.truncated),playbook:taskSummary},
-  timeline:orderedTimeline,hypotheses,sourceReferences:sourceRefs,
+  timeline:orderedTimeline,hypotheses,hypothesisReview:hypothesisLedger?clone(hypothesisLedger):null,sourceReferences:sourceRefs,
   evidenceCoverage:{neighborhood:clone(neighborhood.summary||{}),gapAnalysis:clone(gapAnalysis.summary||{}),
    playbook:taskSummary,sourceCaseSubjects:unique([...(threatIntelligence.signals||[]).filter(item=>String(item.chainId||"").toLowerCase()===subject.chainId).flatMap(item=>item.caseSubjects||[]),...(threatIntelligence.tokenTransfers||[]).filter(item=>String(item.chainId||"").toLowerCase()===subject.chainId).map(item=>item.caseSubject)])},
   analystWorkflow:{playbookId:playbook.id,updatedAt:playbook.updatedAt,tasks:clone(playbook.tasks)},
