@@ -65,7 +65,7 @@ export async function verifyInvestigationDossierSources(dossier,{fetchImpl=globa
  const actualChainId=await rpc(fetchImpl,chain.rpc,"eth_chainId",[],requestId++);
  const chainCheck=validateChainId(chain.chainId,actualChainId);
  if(!chainCheck.ok)throw new Error("RPC chain mismatch: expected "+chain.chainId+" but endpoint returned "+String(actualChainId));
- const selected=hashes.slice(0,maxTransactions),results=[];
+ const selected=hashes.slice(0,maxTransactions),results=[],blockCache=new Map();
  for(const hash of selected){
   const entries=(dossier.timeline||[]).filter(item=>lower(item.transactionHash)===hash);
   try{
@@ -79,10 +79,24 @@ export async function verifyInvestigationDossierSources(dossier,{fetchImpl=globa
    if(lower(receipt.transactionHash)!==hash)baseProblems.push("receipt-transaction-hash-mismatch");
    if(!equalQuantity(tx.blockNumber,receipt.blockNumber))baseProblems.push("transaction-and-receipt-block-number-mismatch");
    if(tx.blockHash&&receipt.blockHash&&lower(tx.blockHash)!==lower(receipt.blockHash))baseProblems.push("transaction-and-receipt-block-hash-mismatch");
+   let canonicalBlock=null,canonicalityStatus="unavailable",canonicalityError=null;
+   const blockNumber=receipt.blockNumber??tx.blockNumber;
+   if(typeof receipt.blockHash==="string"&&blockNumber!==null&&blockNumber!==undefined){
+    try{
+     const key=String(blockNumber).toLowerCase();
+     if(blockCache.has(key))canonicalBlock=blockCache.get(key);
+     else{canonicalBlock=await rpc(fetchImpl,chain.rpc,"eth_getBlockByNumber",[blockNumber,false],requestId++);blockCache.set(key,canonicalBlock);}
+     if(!canonicalBlock)canonicalityStatus="not-found";
+     else if(!equalQuantity(canonicalBlock.number,blockNumber)||lower(canonicalBlock.hash)!==lower(receipt.blockHash)){
+      canonicalityStatus="mismatch";baseProblems.push("receipt-block-hash-does-not-match-rpc-block-at-height");
+     }else canonicalityStatus="matched";
+    }catch(error){canonicalityStatus="unavailable";canonicalityError=error.message;}
+   }
    const evidenceChecks=baseProblems.length?entries.map(item=>({kind:item.kind,status:"not-checked",problems:baseProblems})):entries.map(item=>checkTimelineEntry(item,tx,receipt));
-   results.push({transactionHash:hash,status:baseProblems.length?"inconsistent":"confirmed",blockNumber:receipt.blockNumber,
-    blockHash:receipt.blockHash||tx.blockHash||null,receiptStatus:receipt.status??null,from:lower(tx.from),to:lower(tx.to),logCount:Array.isArray(receipt.logs)?receipt.logs.length:0,
-    evidenceChecks});
+   const status=baseProblems.length?"inconsistent":canonicalityStatus==="matched"?"confirmed":"canonicality-unavailable";
+   results.push({transactionHash:hash,status,blockNumber:receipt.blockNumber,blockHash:receipt.blockHash||tx.blockHash||null,
+    canonicalityStatus,canonicalBlockHash:canonicalBlock?.hash||null,canonicalityError,receiptStatus:receipt.status??null,
+    from:lower(tx.from),to:lower(tx.to),logCount:Array.isArray(receipt.logs)?receipt.logs.length:0,evidenceChecks});
   }catch(error){results.push({transactionHash:hash,status:"rpc-error",blockNumber:null,receiptStatus:null,error:error.message,evidenceChecks:entries.map(item=>({kind:item.kind,status:"not-checked",problems:["rpc-request-failed"]}))});}
  }
  const evidenceChecks=results.flatMap(item=>item.evidenceChecks||[]);
@@ -90,7 +104,7 @@ export async function verifyInvestigationDossierSources(dossier,{fetchImpl=globa
  return {schema:"sentinel.investigation-source-verification.v1",subject:{chainId,address:dossier.subject.address.toLowerCase()},
   observedAt,provider:chain.rpc,providerName:chain.name,chainCheck:{expected:chain.chainId,actual:actualChainId,matched:true},
   coverage:{uniqueTransactionReferences:hashes.length,checkedTransactions:selected.length,notChecked:Math.max(0,hashes.length-selected.length),truncated:hashes.length>selected.length},
-  summary:{confirmedTransactions:count("confirmed"),pendingTransactions:count("pending"),notFoundTransactions:count("not-found"),
+  summary:{confirmedTransactions:count("confirmed"),canonicalityUnavailableTransactions:count("canonicality-unavailable"),pendingTransactions:count("pending"),notFoundTransactions:count("not-found"),
    receiptUnavailableTransactions:count("receipt-unavailable"),inconsistentTransactions:count("inconsistent"),rpcErrors:count("rpc-error"),
    matchedEvidenceChecks:evidenceChecks.filter(item=>item.status==="matched").length,evidenceMismatches:evidenceChecks.filter(item=>item.status==="mismatch").length,notCheckableEvidenceChecks:evidenceChecks.filter(item=>item.status==="not-checkable").length},
   results,limitations:[
@@ -99,6 +113,6 @@ export async function verifyInvestigationDossierSources(dossier,{fetchImpl=globa
    "Receipt-log checks compare only the supplied timeline log index and available transfer fields; they do not prove token decimals, balances, fiat value or complete asset movement.",
    "Pending, not-found, receipt-unavailable and RPC-error results are provider observations; they are not proof that an event never occurred.",
    "Only transaction hashes present in the dossier timeline or 32-byte source references are checked. The configured limit may leave additional references unchecked.",
-   "Block finality, reorg risk and historical provider completeness are not independently established."
+   "A matching block hash checks the provider current view at the queried height; it is not a finality proof. Reorg risk and historical provider completeness are not independently established."
   ]};
 }
