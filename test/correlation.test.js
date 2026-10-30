@@ -3,8 +3,9 @@ import assert from "node:assert/strict";
 import { correlateCases } from "../src/correlation.js";
 
 const a = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-const b = "0x1111111111111111111111111111111111111111";
-const impl = "0x1111111111111111111111111111111111111111";
+const b = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const recipient = "0x1111111111111111111111111111111111111111";
+const impl = "0x3333333333333333333333333333333333333333";
 const admin = "0x2222222222222222222222222222222222222222";
 const report = (subject, observations = []) => ({ schema: "sentinel.case-report.v1", subject, observations });
 
@@ -25,10 +26,10 @@ test("correlates shared proxy admin and EIP-7702 delegation target independently
 });
 
 test("records transaction participants without inferring a relationship verdict", () => {
-  const graph = correlateCases([report("0xcccccccccccccccccccccccccccccccccccccccc", [{ kind: "transaction", value: { from: a, to: b } }])]);
+  const graph = correlateCases([report("0xcccccccccccccccccccccccccccccccccccccccc", [{ kind: "transaction", value: { from: a, to: recipient } }])]);
   assert.equal(graph.edgeCount, 1);
   assert.equal(graph.edges[0].type, "observed-transaction-flow");
-  assert.deepEqual([graph.edges[0].from, graph.edges[0].to], [a, b]);
+  assert.deepEqual([graph.edges[0].from, graph.edges[0].to], [a, recipient]);
 });
 
 test("deduplicates repeated evidence and ignores malformed addresses", () => {
