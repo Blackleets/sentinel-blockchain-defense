@@ -180,3 +180,17 @@ test("extracts and deduplicates receipt Transfer logs in imported evidence", () 
   assert.equal(result.tokenTransfers[0].from, a);
   assert.equal(result.tokenTransfers[0].to, b);
 });
+
+test("builds token-specific address profiles with exact raw-unit totals", () => {
+  const first = transferLog({ data: "0x" + (2500n).toString(16).padStart(64, "0"), logIndex: "0x1" });
+  const second = transferLog({ topics: [transferTopic, indexed(b), indexed(a)], data: "0x" + (500n).toString(16).padStart(64, "0"), logIndex: "0x2", blockNumber: "0x101" });
+  const receipt = { kind: "receipt", value: { transactionHash: "0xabc", blockNumber: "0x100", logs: [first, second] } };
+  const result = analyzeThreatIntelligence([{ ...report(a, [receipt]), subjectType: "transaction" }]);
+  const profile = result.tokenAddressProfiles.find(item => item.address === a && item.token === shared);
+  assert.equal(profile.outgoingTransferCount, 1);
+  assert.equal(profile.incomingTransferCount, 1);
+  assert.equal(profile.outgoingAmountRaw, "2500");
+  assert.equal(profile.incomingAmountRaw, "500");
+  assert.equal(profile.amountUnit, "raw-token-base-units");
+  assert.equal(profile.uniqueCounterpartyCount, 1);
+});
