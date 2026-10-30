@@ -122,3 +122,14 @@ Important interpretation limits:
 - Internal traces are execution-level subcalls and may coexist with their parent transaction; **do not sum internal traces as independent wallet balance changes**.
 - Failed internal traces are excluded from value-flow edges.
 - Token metadata and provider labels are not proof of ownership, legitimacy or risk.
+
+
+## Fund Tracer — candidate route reconstruction
+
+- Reconstructs bounded, directed candidate paths from supplied on-chain value-flow observations.
+- Enforces same-chain and same-asset continuity, chronological block/log ordering, non-increasing raw amount compatibility, cycle rejection and a maximum depth of three hops.
+- Caps output at 20 candidate paths and reports truncation and explored-edge counts.
+- Every hop retains the source transaction hash, block, log index, raw amount, timestamp when available and transfer type.
+- Internal execution traces are excluded from candidate paths to avoid treating parent transactions and subcalls as independent balance movements.
+- Exact or partial amount compatibility is a heuristic only. It does not prove that the same units of an asset moved between addresses; balances may be pooled, replenished or commingled.
+- No path found means only that no candidate path was found in the supplied bounded records. It is not evidence of inactivity.
