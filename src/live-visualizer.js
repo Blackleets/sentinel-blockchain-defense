@@ -46,16 +46,36 @@ export function decodeTransferLogs(logs, { chainId } = {}) {
 }
 
 /** Create a bounded, address-centred graph from live RPC receipt logs. */
-export function buildLiveTransferGraph(transfers, { address, chainId, scannedFrom, scannedTo, maxEdges = 160 } = {}) {
+export function buildLiveTransferGraph(transfers, { address, chainId, scannedFrom, scannedTo, hops = 1, maxEdges = 160, maxNodes = 40 } = {}) {
   const origin = normalizeAddress(address);
   if (!origin) throw new TypeError("A valid EVM address is required");
   if (!Array.isArray(transfers)) throw new TypeError("Transfers must be an array");
   if (typeof chainId !== "string" || !/^0x[0-9a-f]+$/i.test(chainId)) throw new TypeError("A valid hexadecimal chain ID is required");
+  if (!Number.isInteger(hops) || hops < 1 || hops > 2) throw new RangeError("hops must be 1 or 2");
   if (!Number.isInteger(maxEdges) || maxEdges < 1 || maxEdges > 500) throw new RangeError("maxEdges must be between 1 and 500");
-  const accepted = transfers.filter(item => item && item.chainId === String(chainId).toLowerCase() &&
-    (item.from === origin || item.to === origin)).slice().sort((a,b) =>
-      compareHex(a.blockNumber,b.blockNumber) || compareHex(a.logIndex,b.logIndex));
-  const edges = accepted.slice(-maxEdges);
+  if (!Number.isInteger(maxNodes) || maxNodes < 2 || maxNodes > 100) throw new RangeError("maxNodes must be between 2 and 100");
+  const all = transfers.filter(item => item && item.chainId === chainId.toLowerCase()).slice().sort((a,b) =>
+    compareHex(a.blockNumber,b.blockNumber) || compareHex(a.logIndex,b.logIndex));
+  const reachable = new Set([origin]);
+  let frontier = new Set([origin]);
+  const candidates = new Map();
+  for (let depth = 1; depth <= hops && frontier.size; depth++) {
+    const next = new Set();
+    for (const edge of all) {
+      if (!frontier.has(edge.from) && !frontier.has(edge.to)) continue;
+      const other = frontier.has(edge.from) ? edge.to : edge.from;
+      if (!reachable.has(other)) {
+        if (reachable.size >= maxNodes) continue;
+        next.add(other);
+      }
+      candidates.set(edge.transactionHash + "|" + edge.logIndex, edge);
+    }
+    for (const item of next) reachable.add(item);
+    frontier = next;
+  }
+  const ordered = [...candidates.values()].sort((a,b) => compareHex(a.blockNumber,b.blockNumber) ||
+    compareHex(a.logIndex,b.logIndex) || a.transactionHash.localeCompare(b.transactionHash));
+  const edges = ordered.slice(-maxEdges);
   const addresses = new Set([origin]);
   for (const edge of edges) { addresses.add(edge.from); addresses.add(edge.to); }
   const nodes = [...addresses].map(addressValue => ({
@@ -65,15 +85,16 @@ export function buildLiveTransferGraph(transfers, { address, chainId, scannedFro
   })).sort((a,b) => Number(b.origin)-Number(a.origin) || a.address.localeCompare(b.address));
   return {
     schema: "sentinel.live-transfer-graph.v1",
-    chainId: String(chainId).toLowerCase(), origin, scannedFrom, scannedTo,
-    totalObservedEdges: accepted.length, edgeCount: edges.length, nodeCount: nodes.length,
-    truncated: accepted.length > edges.length, nodes, edges,
+    chainId: chainId.toLowerCase(), origin, scannedFrom, scannedTo, hops,
+    totalObservedEdges: ordered.length, edgeCount: edges.length, nodeCount: nodes.length,
+    truncated: ordered.length > edges.length || reachable.size >= maxNodes, nodes, edges,
     coverage: "bounded-live-rpc-transfer-event-logs",
     limitations: [
       "Edges are decoded Transfer-shaped logs returned by one public RPC provider; token legitimacy is not established.",
       "Only the displayed block window is queried. This is not a complete wallet history.",
       "Native transfers, internal calls, non-standard token events and cross-chain relationships are not included.",
-      "A transfer event does not establish beneficial ownership, intent, risk or illicit activity."
+      "A transfer event does not establish beneficial ownership, intent, risk or illicit activity.",
+      "Two-hop expansion is capped at 8 first-hop counterparties and 40 graph nodes; results can be incomplete."
     ]
   };
 }
