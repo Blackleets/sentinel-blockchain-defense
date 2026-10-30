@@ -19,7 +19,7 @@ export function buildEntityEvidencePacket({ neighborhood, graph, threatIntellige
     (addresses.has(normalize(edge.from)) || addresses.has(normalize(edge.to)) ||
      (edge.evidence || []).some(item => addresses.has(normalize(item?.sharedAddress)))));
   const caseSubjects = unique([
-    ...(neighborhood.edges || []).flatMap(edge => (edge.evidence || []).flatMap(item => item.caseSubjects || [])),
+    ...(neighborhood.edges || []).flatMap(edge => (edge.evidence || []).flatMap(item => [...(item.caseSubjects || []), item.caseSubject])) ,
     ...relationshipEvidence.flatMap(edge => (edge.evidence || []).flatMap(item => item.caseSubjects || [])),
     ...(threatIntelligence.signals || []).filter(signal => signal.chainId === chainId &&
       (signal.entities || []).some(address => addresses.has(normalize(address)))).flatMap(signal => signal.caseSubjects || [])
