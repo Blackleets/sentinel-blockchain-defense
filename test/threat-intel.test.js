@@ -116,3 +116,30 @@ test("deduplicates repeated imports of the same transaction hash", () => {
   assert.equal(result.transactionLinks.length, 1);
   assert.equal(result.transactionLinks[0].firstTransaction.hash, "0xaaa");
 });
+
+test("builds chain-scoped address profiles from deduplicated transaction evidence", () => {
+  const result = analyzeThreatIntelligence([
+    report("0x1111111111111111111111111111111111111111", [tx("0xaaa", a, shared, "0x100")]),
+    report("0x2222222222222222222222222222222222222222", [tx("0xbbb", shared, b, "0x101")]),
+    report("0x3333333333333333333333333333333333333333", [tx("0xbbb", shared, b, "0x101")], "0x1"),
+    report("0x4444444444444444444444444444444444444444", [tx("0xccc", a, b, "0x110")], "0x38")
+  ]);
+  const sharedProfile = result.addressProfiles.find(profile => profile.chainId === "0x1" && profile.address === shared);
+  assert.equal(sharedProfile.incomingTransactionCount, 1);
+  assert.equal(sharedProfile.outgoingTransactionCount, 1);
+  assert.equal(sharedProfile.observedTransactionCount, 2);
+  assert.equal(sharedProfile.uniqueObservedCounterpartyCount, 2);
+  assert.equal(sharedProfile.distinctCaseCount, 2);
+  assert.equal(sharedProfile.firstSeenBlock, "0x100");
+  assert.equal(sharedProfile.lastSeenBlock, "0x101");
+  assert.equal(sharedProfile.coverage, "imported-evidence-only");
+  const separateChain = result.addressProfiles.find(profile => profile.chainId === "0x38" && profile.address === a);
+  assert.equal(separateChain.observedTransactionCount, 1);
+});
+
+test("address profiles omit transactions without valid mined evidence", () => {
+  const result = analyzeThreatIntelligence([
+    report("0x1111111111111111111111111111111111111111", [tx(null, a, b, "0x100"), tx("0xabc", a, b, null)])
+  ]);
+  assert.equal(result.addressProfiles.length, 0);
+});
