@@ -208,7 +208,7 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
       const meta = tokenMetadata.get(edge.token) || {};
       const amount = meta.decimals == null ? edge.amountRaw + " raw units" : formatTokenAmount(edge.amountRaw, meta.decimals);
       return '<div class="sl-transfer"><div><code>' + esc(short(edge.from)) + ' → ' + esc(short(edge.to)) + '</code><small>Block ' + parseInt(edge.blockNumber,16).toLocaleString() + ' · ' + esc(edge.transferType || 'ERC-20') + ' · ' + esc(meta.symbol || short(edge.token)) + ' · ' + esc(amount) + '</small></div><a href="' + esc(getNetwork().explorer) + '/tx/' + esc(edge.transactionHash) + '" target="_blank" rel="noopener noreferrer">View transaction ↗</a></div>';
-    }).join("") : '<div class="sl-empty-state">No matching Transfer events for this node in the scanned window.</div>';
+    }).join("") : '<div class="sl-empty-state">No matching value-flow records for this node in the selected coverage window.</div>';
   };
   const showNode = address => {
     if (!current) return;
@@ -224,8 +224,8 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
     const coverageNote=panel.querySelector(".sl-foot");
     if(coverageNote)coverageNote.textContent=graph.coverage==="indexed-mixed-value-flow-history"?"Coverage: Blockscout indexed ERC-20 + native + successful internal value-flow records · internal traces are separate from parent transactions · provider index may be incomplete":graph.coverage==="indexed-erc20-address-history"?"Coverage: Blockscout indexed Ethereum ERC-20 transfer records · pagination status shown above · one-hop graph · provider index may be incomplete":"Coverage: bounded RPC window · ERC-20 Transfer-shaped logs only · single-provider observation · no attribution or risk verdict";
     stats.innerHTML = [
-      ['NODES',graph.nodeCount],['OBSERVED TRANSFER LOGS',graph.totalObservedEdges],
-      ['TOKENS',new Set(graph.edges.map(edge=>edge.token)).size],['HOPS',graph.hops],
+      ['NODES',graph.nodeCount],[graph.coverage==='indexed-mixed-value-flow-history'?'VALUE-FLOW EDGES':'OBSERVED TRANSFER LOGS',graph.totalObservedEdges],
+      ['ASSET / EVENT TYPES',new Set(graph.edges.map(edge=>edge.token)).size],['HOPS',graph.hops],
       ['BLOCK WINDOW',graph.scannedFrom+' → '+graph.scannedTo]
     ].map(([label,value])=>'<span class="sl-stat"><b>'+esc(value)+'</b>'+esc(label)+'</span>').join('');
     const width=760,height=420,positions=new Map();const rings=new Map();for(const node of graph.nodes){const hop=node.hop??1;if(!rings.has(hop))rings.set(hop,[]);rings.get(hop).push(node);}for(const [hop,nodesInRing] of rings){nodesInRing.forEach((node,index)=>positions.set(node.address,point(index,nodesInRing.length,width,height,hop)));}
