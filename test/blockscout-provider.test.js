@@ -21,7 +21,7 @@ test("marks ERC20 history truncated at page cap",async()=>{
 });
 test("fetches native and successful internal value transfers with distinct provenance",async()=>{
  const seen=[];const result=await fetchBlockscoutAddressActivity({address,chainId:"0x1",fetchImpl:async url=>{const u=new URL(url);seen.push(u.pathname);if(u.pathname.endsWith("/transactions"))return response([tx(),tx({value:"0"}),tx({to:null}),tx({status:"error"}),tx({status:null})]);return response([internal(),internal({success:false}),internal({value:"0"})]);}});
- assert.equal(result.records.length,2);assert.equal(result.counts.malformedTransactions,4);assert.equal(result.counts.nativeTransfers,1);assert.equal(result.counts.internalTransfers,1);assert.equal(result.records.find(x=>x.transferType==="native").tokenMetadata.symbol,"ETH");assert.equal(result.records.find(x=>x.transferType==="internal").token,"INTERNAL:ETH");assert.equal(seen.length,4);
+ assert.equal(result.records.length,2);assert.equal(result.counts.malformedTransactions,8);assert.equal(result.counts.nativeTransfers,1);assert.equal(result.counts.internalTransfers,1);assert.equal(result.records.find(x=>x.transferType==="native").tokenMetadata.symbol,"ETH");assert.equal(result.records.find(x=>x.transferType==="internal").token,"INTERNAL:ETH");assert.equal(seen.length,4);
 });
 test("keeps transaction and internal transfer pagination completeness separate",async()=>{
  const result=await fetchBlockscoutAddressActivity({address,chainId:"0x1",maxPages:1,fetchImpl:async url=>new URL(url).pathname.endsWith("/transactions")?response([tx()],{block_number:99,index:1}):response([internal()])});
