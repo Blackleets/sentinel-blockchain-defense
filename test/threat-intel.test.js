@@ -86,3 +86,33 @@ test("does not detect sender bursts across different chains", () => {
   ], { transactionBurstMinEvents: 3, transactionBurstWindowBlocks: 32 });
   assert.equal(result.signals.some(item => item.rule === "transaction-sender-burst"), false);
 });
+
+test("links consecutive observed transaction handoffs on the same chain", () => {
+  const result = analyzeThreatIntelligence([
+    report("0x1111111111111111111111111111111111111111", [tx("0xaaa", a, shared, "0x100")]),
+    report("0x2222222222222222222222222222222222222222", [tx("0xbbb", shared, b, "0x101")])
+  ]);
+  assert.equal(result.transactionLinks.length, 1);
+  assert.equal(result.transactionLinks[0].from, a);
+  assert.equal(result.transactionLinks[0].via, shared);
+  assert.equal(result.transactionLinks[0].to, b);
+  assert.equal(result.transactionLinks[0].interpretation, "observed-transaction-handoff");
+});
+
+test("does not link transaction handoffs across chains or backwards in block order", () => {
+  const result = analyzeThreatIntelligence([
+    report("0x1111111111111111111111111111111111111111", [tx("0xaaa", a, shared, "0x100")], "0x1"),
+    report("0x2222222222222222222222222222222222222222", [tx("0xbbb", shared, b, "0x101")], "0x38"),
+    report("0x3333333333333333333333333333333333333333", [tx("0xccc", shared, b, "0x90")], "0x1")
+  ]);
+  assert.equal(result.transactionLinks.length, 0);
+});
+
+test("deduplicates repeated imports of the same transaction hash", () => {
+  const reportA = report("0x1111111111111111111111111111111111111111", [tx("0xaaa", a, shared, "0x100")]);
+  const reportB = report("0x2222222222222222222222222222222222222222", [tx("0xaaa", a, shared, "0x100")]);
+  const reportC = report("0x3333333333333333333333333333333333333333", [tx("0xbbb", shared, b, "0x101")]);
+  const result = analyzeThreatIntelligence([reportA, reportB, reportC]);
+  assert.equal(result.transactionLinks.length, 1);
+  assert.equal(result.transactionLinks[0].firstTransaction.hash, "0xaaa");
+});
