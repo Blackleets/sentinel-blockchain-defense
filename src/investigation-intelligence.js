@@ -130,5 +130,5 @@ export function buildInvestigationIntelligence({neighborhood,graph,threatIntelli
   evidenceCoverage:{neighborhood:clone(neighborhood.summary||{}),gapAnalysis:clone(gapAnalysis.summary||{}),
    playbook:taskSummary,sourceCaseSubjects:unique([...(threatIntelligence.signals||[]).filter(item=>String(item.chainId||"").toLowerCase()===subject.chainId).flatMap(item=>item.caseSubjects||[]),...(threatIntelligence.tokenTransfers||[]).filter(item=>String(item.chainId||"").toLowerCase()===subject.chainId).map(item=>item.caseSubject)])},
   analystWorkflow:{playbookId:playbook.id,updatedAt:playbook.updatedAt,tasks:clone(playbook.tasks)},
-  limitations});
+  limitations};
 }
