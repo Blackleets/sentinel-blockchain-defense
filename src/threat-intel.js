@@ -249,6 +249,47 @@ export function analyzeThreatIntelligence(reports, overrides = {}) {
     const key = tx.chainId + "|" + tx.transactionHash;
     if (!deduplicatedTransactions.has(key)) deduplicatedTransactions.set(key, tx);
   }
+  const profileMap = new Map();
+  const ensureProfile = (chainId, address) => {
+    const key = chainId + "|" + address;
+    if (!profileMap.has(key)) profileMap.set(key, {
+      chainId, address, outgoingCount: 0, incomingCount: 0,
+      counterparties: new Set(), cases: new Set(), firstSeenBlock: null, lastSeenBlock: null, transactionHashes: []
+    });
+    return profileMap.get(key);
+  };
+  for (const tx of deduplicatedTransactions.values()) {
+    const block = BigInt(tx.blockNumber);
+    const sender = ensureProfile(tx.chainId, tx.from);
+    const recipient = ensureProfile(tx.chainId, tx.to);
+    sender.outgoingCount++;
+    recipient.incomingCount++;
+    sender.counterparties.add(tx.to);
+    recipient.counterparties.add(tx.from);
+    sender.cases.add(tx.subject);
+    recipient.cases.add(tx.subject);
+    for (const profile of [sender, recipient]) {
+      if (profile.firstSeenBlock === null || block < BigInt(profile.firstSeenBlock)) profile.firstSeenBlock = "0x" + block.toString(16);
+      if (profile.lastSeenBlock === null || block > BigInt(profile.lastSeenBlock)) profile.lastSeenBlock = "0x" + block.toString(16);
+      if (profile.transactionHashes.length < 25 && !profile.transactionHashes.includes(tx.transactionHash)) profile.transactionHashes.push(tx.transactionHash);
+    }
+  }
+  const addressProfiles = [...profileMap.values()].map(profile => ({
+    chainId: profile.chainId,
+    address: profile.address,
+    outgoingTransactionCount: profile.outgoingCount,
+    incomingTransactionCount: profile.incomingCount,
+    observedTransactionCount: profile.outgoingCount + profile.incomingCount,
+    uniqueObservedCounterpartyCount: profile.counterparties.size,
+    observedCounterparties: [...profile.counterparties].sort(),
+    distinctCaseCount: profile.cases.size,
+    caseSubjects: [...profile.cases].sort(),
+    firstSeenBlock: profile.firstSeenBlock,
+    lastSeenBlock: profile.lastSeenBlock,
+    transactionHashes: profile.transactionHashes,
+    coverage: "imported-evidence-only"
+  })).sort((a, b) => b.observedTransactionCount - a.observedTransactionCount || a.chainId.localeCompare(b.chainId) || a.address.localeCompare(b.address));
+
   const orderedTransactions = [...deduplicatedTransactions.values()].sort((a, b) => {
     if (a.chainId !== b.chainId) return a.chainId.localeCompare(b.chainId);
     const blockA = BigInt(a.blockNumber), blockB = BigInt(b.blockNumber);
@@ -290,6 +331,7 @@ export function analyzeThreatIntelligence(reports, overrides = {}) {
     signals: signals.sort((a, b) => a.chainId.localeCompare(b.chainId) || a.rule.localeCompare(b.rule) || a.id.localeCompare(b.id)),
     timeline: timelines,
     transactionLinks,
+    addressProfiles,
     warnings,
     assessment: {
       verdict: "not-assessed",
