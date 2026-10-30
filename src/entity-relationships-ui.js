@@ -8,6 +8,7 @@ import {renderInvestigationPlaybook} from "./investigation-playbook-ui.js";
 import {buildInvestigationIntelligence} from "./investigation-intelligence.js";
 import {investigationPlaybookStorageKey} from "./investigation-playbook.js";
 import {hypothesisLedgerStorageKey,reconcileHypothesisLedger,recordHypothesisAssessment} from "./hypothesis-ledger.js";
+import {compareInvestigationSnapshots} from "./investigation-snapshot-diff.js";
 const SVG="http://www.w3.org/2000/svg";
 const TYPE_LABELS={"observed-transaction-flow":"Transaction flow","observed-token-transfer-log":"Token transfer log","transaction-handoff":"Transaction handoff","shared-erc1967-implementation":"Shared ERC-1967 implementation","shared-erc1967-admin-slot":"Shared ERC-1967 admin slot","shared-erc1967-beacon":"Shared ERC-1967 beacon","shared-eip7702-delegation-target":"Shared EIP-7702 target"};
 const TYPE_COLORS={"correlation-graph":"#64d7e8","receipt-log":"#a78bfa","transaction-handoff":"#f6b95d","shared-infrastructure":"#e879b8"};
@@ -106,7 +107,35 @@ function renderInvestigationIntelligence(container,inputs){
  const exportLedger=document.createElement("button");exportLedger.type="button";exportLedger.textContent="EXPORT HYPOTHESIS REVIEW LEDGER ↓";
  exportLedger.addEventListener("click",()=>exportSealedJson(ledger,"sentinel-hypothesis-ledger-"+ledger.subject.chainId+"-"+ledger.subject.address+"-sealed.json").catch(error=>{storageWarning=error.message;}));
  const warning=document.createElement("p");warning.className="sentinel-playbook-warning";warning.textContent=storageWarning||"Analyst assessments are stored locally in this browser. Export the ledger to preserve a portable copy.";
- container.append(metrics,assessment,hypotheses,timeline,caveat,warning,exportButton,exportLedger);
+ const evolution=document.createElement("section");evolution.className="sentinel-rel-compare";
+ const evolutionTitle=document.createElement("h4");evolutionTitle.textContent="CASE EVOLUTION / SNAPSHOT COMPARISON";
+ const evolutionText=document.createElement("p");evolutionText.textContent="Load a previous sealed dossier to compare imported evidence, hypothesis changes and analyst workflow against this current snapshot.";
+ const previousFile=document.createElement("input");previousFile.type="file";previousFile.accept="application/json,.json";previousFile.setAttribute("aria-label","Previous sealed investigation dossier");
+ const compareSnapshots=document.createElement("button");compareSnapshots.type="button";compareSnapshots.textContent="COMPARE WITH CURRENT DOSSIER";
+ const evolutionResult=document.createElement("div");evolutionResult.className="sentinel-playbook-history";evolutionResult.setAttribute("aria-live","polite");evolutionResult.textContent="No previous snapshot loaded.";
+ compareSnapshots.addEventListener("click",async()=>{
+  const file=previousFile.files?.[0];if(!file){evolutionResult.textContent="Select a previous sealed dossier first.";return;}
+  evolutionResult.textContent="Verifying previous snapshot integrity…";
+  try{
+   const seal=JSON.parse(await file.text());
+   if(!await verifyEvidenceArtifactSeal(seal))throw new Error("Previous dossier seal is invalid. Comparison stopped.");
+   const previous=seal.artifact;
+   let latestPlaybook=inputs.playbook;
+   try{const saved=JSON.parse(localStorage.getItem(investigationPlaybookStorageKey(inputs.neighborhood.subject))||"null");if(saved?.schema==="sentinel.investigation-playbook.v1")latestPlaybook=saved;}catch{}
+   let latestLedger=ledger;
+   try{const saved=JSON.parse(localStorage.getItem(storageKey)||"null");if(saved?.schema==="sentinel.hypothesis-ledger.v1")latestLedger=saved;}catch{}
+   const current=buildInvestigationIntelligence({...inputs,playbook:latestPlaybook,hypothesisLedger:latestLedger,generatedAt:new Date().toISOString()});
+   const diff=compareInvestigationSnapshots(previous,current);
+   evolutionResult.replaceChildren();
+   const counts=document.createElement("p");counts.textContent="EVIDENCE · "+diff.evidence.summary.added+" added · "+diff.evidence.summary.retained+" retained · "+diff.evidence.summary.notInCurrentSnapshot+" not included in current snapshot";
+   const reviews=document.createElement("p");reviews.textContent="CHANGES · "+diff.hypothesisChanges.length+" hypothesis changes · "+diff.reviewChanges.length+" analyst review changes · "+diff.taskChanges.length+" task status changes";
+   const detail=document.createElement("pre");detail.style.cssText="white-space:pre-wrap;overflow-wrap:anywhere;font-size:9px;color:#b7d2e2";detail.textContent=JSON.stringify({evidence:{added:diff.evidence.added.map(item=>({kind:item.kind,blockNumber:item.blockNumber,transactionHash:item.transactionHash})),notInCurrentSnapshot:diff.evidence.notInCurrentSnapshot.map(item=>({kind:item.kind,blockNumber:item.blockNumber,transactionHash:item.transactionHash}))},hypothesisChanges:diff.hypothesisChanges,reviewChanges:diff.reviewChanges,taskChanges:diff.taskChanges,limitations:diff.limitations},null,2);
+   const exportDiff=document.createElement("button");exportDiff.type="button";exportDiff.textContent="EXPORT SEALED SNAPSHOT DIFF ↓";exportDiff.addEventListener("click",()=>exportSealedJson(diff,"sentinel-snapshot-diff-"+diff.subject.chainId+"-"+diff.subject.address+"-sealed.json").catch(error=>{evolutionResult.textContent=error.message;}));
+   evolutionResult.append(counts,reviews,detail,exportDiff);
+  }catch(error){evolutionResult.textContent=error.message;}
+ });
+ evolution.append(evolutionTitle,evolutionText,previousFile,compareSnapshots,evolutionResult);
+ container.append(metrics,assessment,hypotheses,timeline,caveat,warning,exportButton,exportLedger,evolution);
 }
 
 export function mountEntityRelationshipExplorer(container,graph,threatIntelligence){
