@@ -341,6 +341,7 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
         graph.activity={erc20:history.itemCount,native:activity.counts.nativeTransfers,internal:activity.counts.internalTransfers,pages:history.pagesFetched+activity.pagesFetched,complete:history.complete&&activity.complete,truncated:history.truncated||activity.truncated,malformed:history.malformedItems+activity.counts.malformedTransactions+activity.counts.malformedInternal,coverage:activity.coverage};
         graph.truncated=graph.truncated||graph.activity.truncated;
         graph.limitations=[...history.limitations,...activity.limitations];
+        graph.explorer=network.explorer;graph.networkName=network.name;
         tokenMetadata=new Map([...Object.entries(history.tokenMetadata),...activity.records.map(item=>[item.token,item.tokenMetadata])]);
         render(graph);
         status.textContent="Ethereum Mainnet · Blockscout · "+history.itemCount+" ERC-20 + "+activity.counts.nativeTransfers+" native + "+activity.counts.internalTransfers+" internal value-flow records · "+graph.activity.pages+" pages · "+(graph.activity.complete?"provider pagination complete":"partial history; page cap reached")+" · internal calls are not additive balance changes · "+new Date().toISOString();
@@ -353,6 +354,7 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
         graph.history={pagesFetched:history.pagesFetched,itemCount:history.itemCount,complete:history.complete,truncated:history.truncated,malformedItems:history.malformedItems,directionCoverage:history.directionCoverage,limitations:history.limitations};
         graph.truncated=graph.truncated||history.truncated;
         graph.limitations=history.limitations;
+        graph.explorer=network.explorer;graph.networkName=network.name;
         tokenMetadata=new Map(Object.entries(history.tokenMetadata));
         render(graph);
         status.textContent="Ethereum Mainnet · Blockscout indexed history · "+history.itemCount.toLocaleString()+" ERC-20 records · "+history.pagesFetched+" pages · "+(history.complete?"provider pagination complete":"partial history; page cap reached")+(history.malformedItems?" · "+history.malformedItems+" malformed records skipped":"")+" · "+new Date().toISOString();
