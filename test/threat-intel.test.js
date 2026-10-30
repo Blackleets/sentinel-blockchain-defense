@@ -65,3 +65,24 @@ test("reports multiple separate upgrade bursts on the same chain", () => {
   ], { upgradeWindowBlocks: 32 });
   assert.equal(result.signals.filter(signal => signal.rule === "upgrade-burst").length, 2);
 });
+
+test("detects repeated sender activity in a configurable block window", () => {
+  const result = analyzeThreatIntelligence([
+    report(a, [tx("0x1", shared, b, "0x100")]),
+    report(b, [tx("0x2", shared, a, "0x110")]),
+    report("0xdddddddddddddddddddddddddddddddddddddddd", [tx("0x3", shared, a, "0x118")])
+  ], { transactionBurstMinEvents: 3, transactionBurstWindowBlocks: 32 });
+  const signal = result.signals.find(item => item.rule === "transaction-sender-burst");
+  assert.ok(signal);
+  assert.equal(signal.window.maxBlocks, 32);
+  assert.equal(signal.evidence.length, 3);
+});
+
+test("does not detect sender bursts across different chains", () => {
+  const result = analyzeThreatIntelligence([
+    report(a, [tx("0x1", shared, b, "0x100")], "0x1"),
+    report(b, [tx("0x2", shared, a, "0x110")], "0x38"),
+    report("0xdddddddddddddddddddddddddddddddddddddddd", [tx("0x3", shared, a, "0x118")], "0x89")
+  ], { transactionBurstMinEvents: 3, transactionBurstWindowBlocks: 32 });
+  assert.equal(result.signals.some(item => item.rule === "transaction-sender-burst"), false);
+});
