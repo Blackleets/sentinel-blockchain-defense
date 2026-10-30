@@ -1,4 +1,5 @@
 import {buildEntityNeighborhood} from "./entity-relationships.js";
+import {buildEntityEvidencePacket} from "./entity-evidence-packet.js";
 import {layoutEntityNeighborhood} from "./entity-layout.js";
 const SVG="http://www.w3.org/2000/svg";
 const TYPE_LABELS={"observed-transaction-flow":"Transaction flow","observed-token-transfer-log":"Token transfer log","transaction-handoff":"Transaction handoff","shared-erc1967-implementation":"Shared ERC-1967 implementation","shared-erc1967-admin-slot":"Shared ERC-1967 admin slot","shared-erc1967-beacon":"Shared ERC-1967 beacon","shared-eip7702-delegation-target":"Shared EIP-7702 target"};
@@ -71,6 +72,7 @@ export function mountEntityRelationshipExplorer(container,graph,threatIntelligen
  pivot.addEventListener("click",()=>{if(!selectedAddress)return;manual.value=selectedAddress;address.value=selectedAddress;render();});
  $("[data-zoom-in]").addEventListener("click",()=>{zoom=Math.min(2.8,zoom*1.2);transform();});$("[data-zoom-out]").addEventListener("click",()=>{zoom=Math.max(.55,zoom/1.2);transform();});$("[data-reset]").addEventListener("click",()=>{zoom=1;pan={x:0,y:0};transform();});
  $("[data-export]").addEventListener("click",()=>{if(current)exportJson({...current,exportedAt:new Date().toISOString()},"sentinel-entity-graph-"+current.subject.chainId+"-"+current.subject.address+".json");});
+ const packetButton=document.createElement("button");packetButton.type="button";packetButton.textContent="EXPORT ENTITY EVIDENCE PACKET ↓";packetButton.addEventListener("click",()=>{if(!current)return;const packet=buildEntityEvidencePacket({neighborhood:current,graph,threatIntelligence});exportJson(packet,"sentinel-entity-packet-"+current.subject.chainId+"-"+current.subject.address+".json");});$("[data-export]").parentElement.appendChild(packetButton);
  svg.addEventListener("wheel",event=>{event.preventDefault();zoom=Math.max(.55,Math.min(2.8,zoom*(event.deltaY<0?1.12:.89)));transform();},{passive:false});
  svg.addEventListener("pointerdown",event=>{if(event.target.closest("[data-node]"))return;drag={x:event.clientX,y:event.clientY,panX:pan.x,panY:pan.y};svg.setPointerCapture(event.pointerId);});
  svg.addEventListener("pointermove",event=>{if(!drag)return;pan.x=drag.panX+(event.clientX-drag.x)*1.1;pan.y=drag.panY+(event.clientY-drag.y)*1.1;transform();});
