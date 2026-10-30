@@ -63,3 +63,17 @@ test("rejects unsupported chains, invalid limits and malformed dossiers",async()
  await assert.rejects(()=>verifyInvestigationDossierSources(dossier(),{fetchImpl:mockFetch().fetchImpl,maxTransactions:101}),/between 1 and 100/);
  await assert.rejects(()=>verifyInvestigationDossierSources({}, {fetchImpl:mockFetch().fetchImpl}),/SENTINEL investigation intelligence dossier/);
 });
+
+test("treats malformed receipt topics as evidence mismatch rather than crashing",async()=>{
+ const malformed={...transferLog,topics:[transferTopic,17,toTopic]};
+ const result=await verifyInvestigationDossierSources(dossier(),{fetchImpl:mockFetch({transactionReceipt:{...receipt,logs:[malformed]}}).fetchImpl});
+ assert.equal(result.summary.confirmedTransactions,1);
+ assert.equal(result.summary.evidenceMismatches,1);
+ assert.ok(result.results[0].evidenceChecks[0].problems.includes("receipt-log-is-not-a-decodable-erc20-transfer"));
+});
+test("checks transaction-flow endpoints against the RPC transaction",async()=>{
+ const data=dossier();data.timeline=[{kind:"observed-transaction-flow",chainId:"0x1",blockNumber:"0x10",transactionHash:txHash,logIndex:null,source:"correlation-graph",record:{edgeType:"observed-transaction-flow",from:address,to:"0xcccccccccccccccccccccccccccccccccccccccc"}}];
+ const result=await verifyInvestigationDossierSources(data,{fetchImpl:mockFetch().fetchImpl});
+ assert.equal(result.summary.evidenceMismatches,1);
+ assert.ok(result.results[0].evidenceChecks[0].problems.includes("transaction-recipient-does-not-match-observed-flow"));
+});
