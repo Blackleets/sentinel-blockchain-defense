@@ -11,12 +11,13 @@ const receipt={transactionHash:txHash,blockNumber:"0x10",blockHash,status:"0x1",
 const dossier=()=>({schema:"sentinel.investigation-intelligence.v1",subject:{chainId:"0x1",address},
  timeline:[{kind:"observed-token-transfer-log",chainId:"0x1",blockNumber:"0x10",transactionHash:txHash,logIndex:"0x0",source:"receipt-log",record:{edgeType:"observed-token-transfer-log",from:address,to:token,evidence:{token,amountRaw:"42"}}}],
  sourceReferences:[txHash]});
-function mockFetch({chainId="0x1",transaction=tx,transactionReceipt=receipt}={}){
+function mockFetch({chainId="0x1",transaction=tx,transactionReceipt=receipt,canonicalBlock={number:"0x10",hash:blockHash}}={}){
  const calls=[];
  const fetchImpl=async(url,options)=>{const request=JSON.parse(options.body);calls.push(request.method);let result;
   if(request.method==="eth_chainId")result=chainId;
   else if(request.method==="eth_getTransactionByHash")result=transaction;
   else if(request.method==="eth_getTransactionReceipt")result=transactionReceipt;
+  else if(request.method==="eth_getBlockByNumber")result=canonicalBlock;
   else throw new Error("Unexpected method "+request.method);
   return {ok:true,status:200,json:async()=>({jsonrpc:"2.0",id:request.id,result})};
  };
@@ -28,7 +29,7 @@ test("confirms transaction receipt and exact transfer-log provenance on the conf
  assert.equal(result.summary.confirmedTransactions,1);
  assert.equal(result.summary.matchedEvidenceChecks,1);
  assert.equal(result.summary.evidenceMismatches,0);
- assert.deepEqual(mock.calls,["eth_chainId","eth_getTransactionByHash","eth_getTransactionReceipt"]);
+ assert.deepEqual(mock.calls,["eth_chainId","eth_getTransactionByHash","eth_getTransactionReceipt","eth_getBlockByNumber"]);
  assert.equal(result.limitations.some(item=>item.includes("one configured public RPC endpoint")),true);
 });
 test("flags a receipt log whose decoded amount differs from the dossier evidence",async()=>{
@@ -84,4 +85,17 @@ test("does not call an uncorroborated hash-only timeline reference a matched evi
  assert.equal(result.summary.matchedEvidenceChecks,0);
  assert.equal(result.summary.notCheckableEvidenceChecks,1);
  assert.equal(result.results[0].evidenceChecks[0].status,"not-checkable");
+});
+
+test("marks a receipt inconsistent when its block hash differs from the RPC block at that height",async()=>{
+ const result=await verifyInvestigationDossierSources(dossier(),{fetchImpl:mockFetch({canonicalBlock:{number:"0x10",hash:"0x"+"3".repeat(64)}}).fetchImpl});
+ assert.equal(result.summary.inconsistentTransactions,1);
+ assert.equal(result.summary.confirmedTransactions,0);
+ assert.ok(result.results[0].evidenceChecks[0].problems.includes("receipt-block-hash-does-not-match-rpc-block-at-height"));
+});
+test("keeps receipt verification separate when canonical block lookup is unavailable",async()=>{
+ const result=await verifyInvestigationDossierSources(dossier(),{fetchImpl:mockFetch({canonicalBlock:null}).fetchImpl});
+ assert.equal(result.summary.canonicalityUnavailableTransactions,1);
+ assert.equal(result.summary.confirmedTransactions,0);
+ assert.equal(result.results[0].canonicalityStatus,"not-found");
 });
