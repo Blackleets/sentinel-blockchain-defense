@@ -126,7 +126,7 @@ Important interpretation limits:
 
 ## Fund Tracer — candidate route reconstruction
 
-- Reconstructs bounded, directed candidate paths from supplied on-chain value-flow observations.
+- Reconstructs bounded, directed candidate paths from supplied on-chain value-flow observations through the Live Visualizer's destination-address Fund Tracer panel.
 - Enforces same-chain and same-asset continuity, chronological block/log ordering, non-increasing raw amount compatibility, cycle rejection and a maximum depth of three hops.
 - Caps output at 20 candidate paths and reports truncation and explored-edge counts.
 - Every hop retains the source transaction hash, block, log index, raw amount, timestamp when available and transfer type.
