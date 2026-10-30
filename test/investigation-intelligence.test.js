@@ -47,3 +47,17 @@ test("hypotheses remain verification questions rather than attribution claims",(
  assert.match(result.hypotheses.find(item=>item.id==="handoff-asset-continuity").verification,/each leg/);
  assert.equal(result.assessment.riskScore,null);
 });
+
+test("embeds append-only analyst hypothesis reviews in the reproducible dossier",()=>{
+ const ledger={schema:"sentinel.hypothesis-ledger.v1",subject:{chainId:"0x1",address},createdAt:"2026-10-30T10:00:00.000Z",updatedAt:"2026-10-30T10:05:00.000Z",
+  entries:[{id:"transfer-log-semantics",question:"Do the logs represent valid transfers?",status:"supported",assessments:[{id:"review-1",revision:1,status:"supported",note:"Receipt checked",evidenceReference:"case-1/log-2",updatedAt:"2026-10-30T10:05:00.000Z"}]}],limitations:[]};
+ const result=buildInvestigationIntelligence({...inputs,hypothesisLedger:ledger});
+ assert.equal(result.summary.hypothesisReview.supported,1);
+ assert.equal(result.summary.hypothesisReview.assessmentCount,1);
+ assert.equal(result.hypothesisReview.entries[0].assessments[0].evidenceReference,"case-1/log-2");
+ assert.equal(result.assessment.verdict,"not-assessed");
+});
+test("rejects a hypothesis review ledger from a different investigation subject",()=>{
+ const ledger={schema:"sentinel.hypothesis-ledger.v1",subject:{chainId:"0x89",address},entries:[]};
+ assert.throws(()=>buildInvestigationIntelligence({...inputs,hypothesisLedger:ledger}),/does not match/);
+});
