@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ERC20_TRANSFER_TOPIC, decodeTransferLogs, buildLiveTransferGraph } from "../src/live-visualizer.js";
+import { ERC20_TRANSFER_TOPIC, decodeTransferLogs, buildLiveTransferGraph, formatTokenAmount, decodeAbiString, decodeTokenMetadata } from "../src/live-visualizer.js";
 
 const a="0x1111111111111111111111111111111111111111";
 const b="0x2222222222222222222222222222222222222222";
@@ -23,6 +23,22 @@ test("builds an address-centred graph with bounded edges and chain isolation",()
  const graph=buildLiveTransferGraph(transfers,{address:a,chainId:"0x1",scannedFrom:"100",scannedTo:"200",maxEdges:1});
  assert.equal(graph.nodeCount,2);assert.equal(graph.edgeCount,1);assert.equal(graph.totalObservedEdges,2);
  assert.equal(graph.truncated,true);assert.equal(graph.origin,a);assert.equal(graph.coverage,"bounded-live-rpc-transfer-event-logs");
+});
+test("formats base-unit amounts without floating-point precision loss",()=>{
+ assert.equal(formatTokenAmount("1234567890123456789",18),"1.234567890123456789");
+ assert.equal(formatTokenAmount("5000000",6),"5");
+ assert.equal(formatTokenAmount("42",0),"42");
+ assert.match(formatTokenAmount("42",null),/raw units/);
+});
+test("decodes standard ABI strings, bytes32 symbols and bounded decimals",()=>{
+ const word=n=>BigInt(n).toString(16).padStart(64,"0");
+ const bytes=Buffer.from("USDC","utf8").toString("hex").padEnd(64,"0");
+ const dynamic="0x"+word(32)+word(4)+Buffer.from("USDC","utf8").toString("hex").padEnd(64,"0");
+ assert.equal(decodeAbiString(dynamic),"USDC");
+ assert.equal(decodeAbiString("0x"+bytes),"USDC");
+ const metadata=decodeTokenMetadata({symbolResult:dynamic,nameResult:dynamic,decimalsResult:"0x"+word(6)});
+ assert.deepEqual(metadata,{symbol:"USDC",name:"USDC",decimals:6});
+ assert.equal(decodeTokenMetadata({decimalsResult:"0x"+word(255)}).decimals,null);
 });
 test("rejects invalid addresses and edge bounds",()=>{
  assert.throws(()=>buildLiveTransferGraph([],{address:"bad",chainId:"0x1"}),/valid EVM address/);
