@@ -1,4 +1,4 @@
-import { fetchBlockscoutAddressTransfers, BLOCKSCOUT_ENDPOINTS } from "./blockscout-provider.js";
+import { fetchBlockscoutAddressTransfers, fetchBlockscoutAddressActivity, BLOCKSCOUT_ENDPOINTS } from "./blockscout-provider.js";
 const ADDRESS = /^0x[0-9a-f]{40}$/i;
 const HASH = /^0x[0-9a-f]{64}$/i;
 export const ERC20_TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
@@ -180,7 +180,7 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
   panel.className = "sentinel-live";
   panel.innerHTML = `
     <div class="sl-head"><div><div class="sl-kicker">SENTINEL / LIVE VISUALIZER</div><h2>Address relationship map</h2><p>Explore on-chain Transfer events around an address. Every edge links to its source transaction.</p></div><span class="sl-readonly">● READ ONLY</span></div>
-    <form class="sl-controls"><input name="address" spellcheck="false" autocomplete="off" placeholder="Paste an EVM wallet or contract address" aria-label="Address to trace" required><label>History source <select name="source"><option value="rpc" selected>Live RPC · recent blocks</option><option value="indexed">Indexed history · Ethereum</option></select></label><label>Block window <select name="window"><option value="500">500</option><option value="2000" selected>2,000</option><option value="5000">5,000</option><option value="10000">10,000</option></select></label><label>Graph depth <select name="hops"><option value="1" selected>1 hop</option><option value="2">2 hops</option></select></label><button type="submit">Trace address ↗</button></form>
+    <form class="sl-controls"><input name="address" spellcheck="false" autocomplete="off" placeholder="Paste an EVM wallet or contract address" aria-label="Address to trace" required><label>History source <select name="source"><option value="rpc" selected>Live RPC · recent blocks</option><option value="indexed">Indexed ERC-20 history · Ethereum</option><option value="activity">Indexed activity · ETH + internal · Ethereum</option></select></label><label>Block window <select name="window"><option value="500">500</option><option value="2000" selected>2,000</option><option value="5000">5,000</option><option value="10000">10,000</option></select></label><label>Graph depth <select name="hops"><option value="1" selected>1 hop</option><option value="2">2 hops</option></select></label><button type="submit">Trace address ↗</button></form>
     <div class="sl-meta" data-role="status">Choose an address to build a live relationship map from recent ERC-20 Transfer logs.</div>
     <div class="sl-stats" data-role="stats"></div>
     <div class="sl-layout"><div class="sl-canvas" data-role="canvas"><div class="sl-empty">Your graph will appear here</div></div><aside class="sl-inspector" data-role="inspector"><span class="sl-kicker">NODE INSPECTOR</span><strong>Select a node</strong><p>Address details and observed transfer evidence will appear here.</p></aside></div>
@@ -207,7 +207,7 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
     ledger.innerHTML = visible.length ? visible.slice().reverse().slice(0, 30).map(edge => {
       const meta = tokenMetadata.get(edge.token) || {};
       const amount = meta.decimals == null ? edge.amountRaw + " raw units" : formatTokenAmount(edge.amountRaw, meta.decimals);
-      return '<div class="sl-transfer"><div><code>' + esc(short(edge.from)) + ' → ' + esc(short(edge.to)) + '</code><small>Block ' + parseInt(edge.blockNumber,16).toLocaleString() + ' · ' + esc(meta.symbol || short(edge.token)) + ' · ' + esc(amount) + '</small></div><a href="' + esc(getNetwork().explorer) + '/tx/' + esc(edge.transactionHash) + '" target="_blank" rel="noopener noreferrer">View transaction ↗</a></div>';
+      return '<div class="sl-transfer"><div><code>' + esc(short(edge.from)) + ' → ' + esc(short(edge.to)) + '</code><small>Block ' + parseInt(edge.blockNumber,16).toLocaleString() + ' · ' + esc(edge.transferType || 'ERC-20') + ' · ' + esc(meta.symbol || short(edge.token)) + ' · ' + esc(amount) + '</small></div><a href="' + esc(getNetwork().explorer) + '/tx/' + esc(edge.transactionHash) + '" target="_blank" rel="noopener noreferrer">View transaction ↗</a></div>';
     }).join("") : '<div class="sl-empty-state">No matching Transfer events for this node in the scanned window.</div>';
   };
   const showNode = address => {
@@ -215,14 +215,14 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
     selected = address;
     const node = current.nodes.find(item => item.address === address);
     const incoming = current.edges.filter(edge => edge.to === address), outgoing = current.edges.filter(edge => edge.from === address);
-    inspector.innerHTML = '<span class="sl-kicker">NODE INSPECTOR</span><strong>'+esc(address)+'</strong><div class="sl-kv">Role<b>'+(node.origin?'Trace origin':'Observed counterparty')+'</b></div><div class="sl-kv">Hop distance<b>'+(node.hop??'unknown')+'</b></div><div class="sl-kv">Incoming Transfer logs<b>'+incoming.length+'</b></div><div class="sl-kv">Outgoing Transfer logs<b>'+outgoing.length+'</b></div><div class="sl-kv">Token contracts observed<b>'+new Set([...incoming,...outgoing].map(edge=>edge.token)).size+'</b></div><a href="'+esc(getNetwork().explorer)+'/address/'+esc(address)+'" target="_blank" rel="noopener noreferrer">Open address in explorer ↗</a>';
+    inspector.innerHTML = '<span class="sl-kicker">NODE INSPECTOR</span><strong>'+esc(address)+'</strong><div class="sl-kv">Role<b>'+(node.origin?'Trace origin':'Observed counterparty')+'</b></div><div class="sl-kv">Hop distance<b>'+(node.hop??'unknown')+'</b></div><div class="sl-kv">Incoming value-flow edges<b>'+incoming.length+'</b></div><div class="sl-kv">Outgoing value-flow edges<b>'+outgoing.length+'</b></div><div class="sl-kv">Assets / transfer types<b>'+new Set([...incoming,...outgoing].map(edge=>edge.token)).size+'</b></div><a href="'+esc(getNetwork().explorer)+'/address/'+esc(address)+'" target="_blank" rel="noopener noreferrer">Open address in explorer ↗</a>';
     panel.querySelectorAll(".sl-node").forEach(el => el.classList.toggle("is-selected",el.dataset.address===address));
     renderNodeLedger(address);
   };
   const render = graph => {
     current = graph; selected = graph.origin;
     const coverageNote=panel.querySelector(".sl-foot");
-    if(coverageNote)coverageNote.textContent=graph.coverage==="indexed-erc20-address-history"?"Coverage: Blockscout indexed Ethereum ERC-20 transfer records · pagination status shown above · one-hop graph · provider index may be incomplete":"Coverage: bounded RPC window · ERC-20 Transfer-shaped logs only · single-provider observation · no attribution or risk verdict";
+    if(coverageNote)coverageNote.textContent=graph.coverage==="indexed-mixed-value-flow-history"?"Coverage: Blockscout indexed ERC-20 + native + successful internal value-flow records · internal traces are separate from parent transactions · provider index may be incomplete":graph.coverage==="indexed-erc20-address-history"?"Coverage: Blockscout indexed Ethereum ERC-20 transfer records · pagination status shown above · one-hop graph · provider index may be incomplete":"Coverage: bounded RPC window · ERC-20 Transfer-shaped logs only · single-provider observation · no attribution or risk verdict";
     stats.innerHTML = [
       ['NODES',graph.nodeCount],['OBSERVED TRANSFER LOGS',graph.totalObservedEdges],
       ['TOKENS',new Set(graph.edges.map(edge=>edge.token)).size],['HOPS',graph.hops],
@@ -250,8 +250,8 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
   };
   form.elements.source.addEventListener("change",()=>{
     const indexed=form.elements.source.value==="indexed";
-    form.elements.window.disabled=indexed;
-    form.elements.hops.disabled=indexed;
+    form.elements.window.disabled=indexed||form.elements.source.value==="activity";
+    form.elements.hops.disabled=indexed||form.elements.source.value==="activity";
     if(indexed)form.elements.hops.value="1";
   });
   form.addEventListener("submit",async event=>{
@@ -262,7 +262,26 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
     canvas.innerHTML='<div class="sl-empty">Querying '+(source==="indexed"?"indexed address history":"live RPC Transfer logs")+'…</div>';ledger.replaceChildren();stats.replaceChildren();
     try{
       let graph;
-      if(source==="indexed"){
+      if(source==="activity"){
+        if(!BLOCKSCOUT_ENDPOINTS[String(network.chainId).toLowerCase()])throw new Error("Indexed activity is not configured for "+network.name+". Select Ethereum Mainnet or switch to Live RPC.");
+        const [history,activity]=await Promise.all([
+          fetchBlockscoutAddressTransfers({address,chainId:network.chainId,maxPages:8}),
+          fetchBlockscoutAddressActivity({address,chainId:network.chainId,maxPages:4})
+        ]);
+        const combined=[...history.transfers,...activity.records];
+        const blockValues=combined.map(item=>BigInt(item.blockNumber));
+        const fromBlock=blockValues.length?blockValues.reduce((a,b)=>a<b?a:b).toString():"n/a";
+        const toBlock=blockValues.length?blockValues.reduce((a,b)=>a>b?a:b).toString():"n/a";
+        graph=buildLiveTransferGraph(combined,{address,chainId:network.chainId,scannedFrom:fromBlock,scannedTo:toBlock,hops:1,maxEdges:160,maxNodes:40});
+        graph.coverage="indexed-mixed-value-flow-history";
+        graph.provider=history.provider;
+        graph.activity={erc20:history.itemCount,native:activity.counts.nativeTransfers,internal:activity.counts.internalTransfers,pages:history.pagesFetched+activity.pagesFetched,complete:history.complete&&activity.complete,truncated:history.truncated||activity.truncated,malformed:history.malformedItems+activity.counts.malformedTransactions+activity.counts.malformedInternal,coverage:activity.coverage};
+        graph.truncated=graph.truncated||graph.activity.truncated;
+        graph.limitations=[...history.limitations,...activity.limitations];
+        tokenMetadata=new Map([...Object.entries(history.tokenMetadata),...activity.records.map(item=>[item.token,item.tokenMetadata])]);
+        render(graph);
+        status.textContent="Ethereum Mainnet · Blockscout · "+history.itemCount+" ERC-20 + "+activity.counts.nativeTransfers+" native + "+activity.counts.internalTransfers+" internal value-flow records · "+graph.activity.pages+" pages · "+(graph.activity.complete?"provider pagination complete":"partial history; page cap reached")+" · internal calls are not additive balance changes · "+new Date().toISOString();
+      }else if(source==="indexed"){
         if(!BLOCKSCOUT_ENDPOINTS[String(network.chainId).toLowerCase()])throw new Error("Indexed history is not configured for "+network.name+". Select Ethereum Mainnet or switch to Live RPC.");
         const history=await fetchBlockscoutAddressTransfers({address,chainId:network.chainId,maxPages:8});
         graph=buildLiveTransferGraph(history.transfers,{address,chainId:network.chainId,scannedFrom:history.blockRange?.from??"n/a",scannedTo:history.blockRange?.to??"n/a",hops:1,maxEdges:160,maxNodes:40});
