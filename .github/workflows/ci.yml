@@ -2,7 +2,7 @@ name: SENTINEL CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/evidence-confidence-engine]
   pull_request:
     branches: [main]
 
