@@ -126,6 +126,7 @@ export function buildAddressInvestigation({ reports, graph, threatIntelligence, 
     item.chainId === selectedChain && (item.from === selectedAddress || item.to === selectedAddress)
   ).map(item => {
     relatedAddresses.add(item.from); relatedAddresses.add(item.to);
+    if (item.caseSubject) caseSubjects.add(item.caseSubject.toLowerCase());
     addBlock(item.blockNumber);
     return { ...item, direction: item.from === selectedAddress && item.to === selectedAddress ? "self" : item.from === selectedAddress ? "outgoing" : "incoming" };
   }).sort((a, b) => {
@@ -160,7 +161,6 @@ export function buildAddressInvestigation({ reports, graph, threatIntelligence, 
     ));
   const addressProfile = (threatIntelligence.addressProfiles || []).find(profile => profile.chainId === selectedChain && profile.address === selectedAddress) || null;
   const tokenProfiles = (threatIntelligence.tokenAddressProfiles || []).filter(profile => profile.chainId === selectedChain && profile.address === selectedAddress);
-  for (const profile of tokenProfiles) relatedAddresses.add(...[]);
   relatedAddresses.delete(selectedAddress);
 
   const includedTransactions = transactions.slice(0, maxTransactions);
@@ -205,6 +205,13 @@ export function buildAddressInvestigation({ reports, graph, threatIntelligence, 
 export function listInvestigableAddresses({ graph, threatIntelligence }) {
   const entries = new Map();
   for (const node of graph?.nodes || []) entries.set(node.chainId + "|" + node.address, { chainId: node.chainId, address: node.address, roles: [...(node.roles || [])] });
+  for (const edge of graph?.edges || []) {
+    for (const address of [edge.from, edge.to]) {
+      if (!addressOf(address)) continue;
+      const key = edge.chainId + "|" + address.toLowerCase();
+      if (!entries.has(key)) entries.set(key, { chainId: edge.chainId, address: address.toLowerCase(), roles: ["correlation-edge-endpoint"] });
+    }
+  }
   for (const profile of threatIntelligence?.addressProfiles || []) {
     const key = profile.chainId + "|" + profile.address;
     const item = entries.get(key) || { chainId: profile.chainId, address: profile.address, roles: [] };
