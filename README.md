@@ -61,7 +61,9 @@ Because the application uses native JavaScript modules, serve the repository ove
 
 - Trace an arbitrary EVM address against the currently selected Ethereum, BNB Smart Chain or Polygon public RPC endpoint.
 - Query a user-selected recent block window for indexed ERC-20 `Transfer(address,address,uint256)` event logs where the address is sender or recipient.
-- Render an address-centred interactive relationship graph, node inspector and transaction evidence ledger. Every displayed edge links to its transaction in the selected chain explorer.
+- Expand the graph to one or two hops. Two-hop mode queries up to eight first-hop counterparties and caps the graph at 40 nodes / 160 edges.
+- Render a directional address-centred relationship graph, selectable node inspector and node-focused transaction evidence ledger. Every displayed edge links to its transaction in the selected chain explorer.
+- Read token `symbol`, `name` and `decimals` through bounded read-only calls; format quantities with integer arithmetic and retain raw values in evidence.
 - The trace verifies the RPC chain ID before accepting results, deduplicates transaction/log pairs, caps graph edges and automatically retries smaller block windows when a provider rejects a range.
 - The graph is explicitly limited to Transfer-shaped logs returned by one provider. It does not include native transfers, internal calls, full wallet history, cross-chain hops, token legitimacy, ownership attribution or a risk verdict. A zero-result scan is not evidence of inactivity.
 
