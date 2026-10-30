@@ -35,7 +35,7 @@ function normalizeTransfer(item, chainId) {
   };
 }
 function normalizeNativeTransaction(item, chainId) {
-  if (!item || !HASH.test(item.hash || "")) return null;
+  if (!item || !HASH.test(item.hash || "") || item.status !== "ok") return null;
   const from = normalizeAddress(item.from?.hash), to = normalizeAddress(item.to?.hash);
   const value = item.value;
   const blockNumber = asHex(item.block_number), position = asHex(item.position);
