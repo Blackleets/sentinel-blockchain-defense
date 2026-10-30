@@ -54,3 +54,14 @@ test("rejects invalid rule configuration and invalid input", () => {
   assert.throws(() => analyzeThreatIntelligence({}, {}), /array/);
   assert.throws(() => analyzeThreatIntelligence([], { repeatedSenderMinCases: 0 }), /positive integer/);
 });
+
+test("reports multiple separate upgrade bursts on the same chain", () => {
+  const event = blockNumber => ({ event: "Upgraded", blockNumber });
+  const result = analyzeThreatIntelligence([
+    report(a, [{ kind: "erc1967-events", events: [event("0x100")] }]),
+    report(b, [{ kind: "erc1967-events", events: [event("0x110")] }]),
+    report("0xdddddddddddddddddddddddddddddddddddddddd", [{ kind: "erc1967-events", events: [event("0x1000")] }]),
+    report("0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", [{ kind: "erc1967-events", events: [event("0x1010")] }])
+  ], { upgradeWindowBlocks: 32 });
+  assert.equal(result.signals.filter(signal => signal.rule === "upgrade-burst").length, 2);
+});
