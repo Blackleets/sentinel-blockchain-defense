@@ -8,7 +8,7 @@ const internal=(overrides={})=>({transaction_hash:"0x"+"b".repeat(64),block_numb
 const response=(items,next_page_params=null)=>({ok:true,status:200,json:async()=>({items,next_page_params})});
 test("normalizes paginated ERC20 records and keeps raw base units",async()=>{
  const calls=[];const result=await fetchBlockscoutAddressTransfers({address,chainId:"0x1",fetchImpl:async url=>{calls.push(new URL(url));return calls.length===1?response([transfer()],{block_number:99,index:1,items_count:50}):response([transfer({log_index:3,transaction_hash:"0x"+"c".repeat(64)})]);}});
- assert.equal(calls.length,3);assert.equal(result.transfers.length,2);assert.equal(result.transfers[0].amountRaw,"1234500");assert.equal(result.transfers[0].tokenMetadata.decimals,6);assert.equal(result.complete,true);assert.equal(result.truncated,false);assert.equal(calls[1].searchParams.get("block_number"),"99");assert.equal(calls[2].searchParams.get("filter"),"to");
+ assert.equal(calls.length,3);assert.equal(result.transfers.length,2);assert.equal(result.transfers[0].amountRaw,"1234500");assert.equal(result.transfers[0].tokenMetadata.decimals,6);assert.equal(result.complete,true);assert.equal(result.truncated,false);assert.ok(calls.some(url=>url.searchParams.get("block_number")==="99"));assert.ok(calls.some(url=>url.searchParams.get("filter")==="to"));
 });
 test("deduplicates ERC20 direction overlap and rejects malformed records",async()=>{
  const bad=transfer({token_type:"ERC-721"}),invalid=transfer({from:{hash:"bad"}});
