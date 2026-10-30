@@ -7,7 +7,7 @@ const toBigInt=value=>{if(typeof value==="number"&&Number.isSafeInteger(value)&&
 const equalQuantity=(a,b)=>{const left=toBigInt(a),right=toBigInt(b);return left!==null&&right!==null&&left===right;};
 const unique=values=>[...new Set(values)];
 function decodeTransfer(log){
- if(!log||!Array.isArray(log.topics)||log.topics.length!==3||lower(log.topics[0])!==TRANSFER_TOPIC||typeof log.data!=="string"||!/^0x[0-9a-f]{64}$/i.test(log.data))return null;
+ if(!log||!Array.isArray(log.topics)||log.topics.length!==3||log.topics.some(topic=>typeof topic!=="string"||!/^0x[0-9a-f]{64}$/i.test(topic))||lower(log.topics[0])!==TRANSFER_TOPIC||typeof log.data!=="string"||!/^0x[0-9a-f]{64}$/i.test(log.data))return null;
  const from="0x"+log.topics[1].slice(-40),to="0x"+log.topics[2].slice(-40),token=lower(log.address);
  if(!ADDRESS.test(from)||!ADDRESS.test(to)||!ADDRESS.test(token||""))return null;
  return {token,from:lower(from),to:lower(to),amountRaw:BigInt(log.data).toString()};
@@ -24,7 +24,7 @@ function checkTimelineEntry(item,tx,receipt){
  const problems=[];
  if(item.blockNumber!==null&&item.blockNumber!==undefined&&!equalQuantity(item.blockNumber,tx.blockNumber))problems.push("timeline-block-does-not-match-transaction");
  if(item.logIndex!==null&&item.logIndex!==undefined){
-  const log=(receipt.logs||[]).find(candidate=>equalQuantity(candidate.logIndex,item.logIndex));
+  const log=(Array.isArray(receipt.logs)?receipt.logs:[]).find(candidate=>equalQuantity(candidate.logIndex,item.logIndex));
   if(!log)problems.push("log-index-not-found-in-transaction-receipt");
   else{
    const expected=item.record?.evidence;
