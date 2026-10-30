@@ -9,6 +9,7 @@ import {buildInvestigationIntelligence} from "./investigation-intelligence.js";
 import {investigationPlaybookStorageKey} from "./investigation-playbook.js";
 import {hypothesisLedgerStorageKey,reconcileHypothesisLedger,recordHypothesisAssessment} from "./hypothesis-ledger.js";
 import {compareInvestigationSnapshots} from "./investigation-snapshot-diff.js";
+import {validateInvestigationDossier} from "./investigation-dossier-validation.js";
 const SVG="http://www.w3.org/2000/svg";
 const TYPE_LABELS={"observed-transaction-flow":"Transaction flow","observed-token-transfer-log":"Token transfer log","transaction-handoff":"Transaction handoff","shared-erc1967-implementation":"Shared ERC-1967 implementation","shared-erc1967-admin-slot":"Shared ERC-1967 admin slot","shared-erc1967-beacon":"Shared ERC-1967 beacon","shared-eip7702-delegation-target":"Shared EIP-7702 target"};
 const TYPE_COLORS={"correlation-graph":"#64d7e8","receipt-log":"#a78bfa","transaction-handoff":"#f6b95d","shared-infrastructure":"#e879b8"};
@@ -120,6 +121,8 @@ function renderInvestigationIntelligence(container,inputs){
    const seal=JSON.parse(await file.text());
    if(!await verifyEvidenceArtifactSeal(seal))throw new Error("Previous dossier seal is invalid. Comparison stopped.");
    const previous=seal.artifact;
+   const previousValidation=validateInvestigationDossier(previous);
+   if(!previousValidation.valid)throw new Error("Previous dossier structure is invalid: "+previousValidation.errors.join(" · "));
    let latestPlaybook=inputs.playbook;
    try{const saved=JSON.parse(localStorage.getItem(investigationPlaybookStorageKey(inputs.neighborhood.subject))||"null");if(saved?.schema==="sentinel.investigation-playbook.v1")latestPlaybook=saved;}catch{}
    let latestLedger=ledger;
@@ -129,9 +132,10 @@ function renderInvestigationIntelligence(container,inputs){
    evolutionResult.replaceChildren();
    const counts=document.createElement("p");counts.textContent="EVIDENCE · "+diff.evidence.summary.added+" added · "+diff.evidence.summary.retained+" retained · "+diff.evidence.summary.notInCurrentSnapshot+" not included in current snapshot";
    const reviews=document.createElement("p");reviews.textContent="CHANGES · "+diff.hypothesisChanges.length+" hypothesis changes · "+diff.reviewChanges.length+" analyst review changes · "+diff.taskChanges.length+" task status changes";
+   const validationNote=document.createElement("p");validationNote.textContent="PREVIOUS DOSSIER · SHA-256 valid · Structure valid · "+previousValidation.warnings.length+" structural warning(s) · Source verification not performed.";
    const detail=document.createElement("pre");detail.style.cssText="white-space:pre-wrap;overflow-wrap:anywhere;font-size:9px;color:#b7d2e2";detail.textContent=JSON.stringify({evidence:{added:diff.evidence.added.map(item=>({kind:item.kind,blockNumber:item.blockNumber,transactionHash:item.transactionHash})),notInCurrentSnapshot:diff.evidence.notInCurrentSnapshot.map(item=>({kind:item.kind,blockNumber:item.blockNumber,transactionHash:item.transactionHash}))},hypothesisChanges:diff.hypothesisChanges,reviewChanges:diff.reviewChanges,taskChanges:diff.taskChanges,limitations:diff.limitations},null,2);
    const exportDiff=document.createElement("button");exportDiff.type="button";exportDiff.textContent="EXPORT SEALED SNAPSHOT DIFF ↓";exportDiff.addEventListener("click",()=>exportSealedJson(diff,"sentinel-snapshot-diff-"+diff.subject.chainId+"-"+diff.subject.address+"-sealed.json").catch(error=>{evolutionResult.textContent=error.message;}));
-   evolutionResult.append(counts,reviews,detail,exportDiff);
+   evolutionResult.append(counts,reviews,validationNote,detail,exportDiff);
   }catch(error){evolutionResult.textContent=error.message;}
  });
  evolution.append(evolutionTitle,evolutionText,previousFile,compareSnapshots,evolutionResult);
@@ -211,7 +215,11 @@ export function mountEntityRelationshipExplorer(container,graph,threatIntelligen
   try{
    const seal=JSON.parse(await file.text());
    const valid=await verifyEvidenceArtifactSeal(seal);
-   integrityResult.textContent=valid?"INTEGRITY VALID · The artifact content matches its SHA-256 digest. This does not prove authorship or truth.":"INTEGRITY INVALID · The file is malformed, unsupported or its artifact content no longer matches the digest.";
+   if(!valid){integrityResult.textContent="INTEGRITY INVALID · The file is malformed, unsupported or its artifact content no longer matches the digest.";return;}
+   if(seal.artifact?.schema==="sentinel.investigation-intelligence.v1"){
+    const validation=validateInvestigationDossier(seal.artifact);
+    integrityResult.textContent=validation.valid?"SHA-256 VALID · DOSSIER STRUCTURE VALID · "+validation.warnings.length+" warning(s) · Source verification NOT PERFORMED. This does not prove authorship or on-chain truth.": "SHA-256 VALID · DOSSIER STRUCTURE INVALID · "+validation.errors.join(" · ");
+   }else integrityResult.textContent="INTEGRITY VALID · The artifact content matches its SHA-256 digest. This does not prove authorship or truth.";
   }catch(error){integrityResult.textContent="VERIFICATION ERROR · "+error.message;}
  });
  return{panel,explore:render,get result(){return current;}};
