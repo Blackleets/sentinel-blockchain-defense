@@ -42,6 +42,15 @@ test("decodes standard ABI strings, bytes32 symbols and bounded decimals",()=>{
  assert.deepEqual(metadata,{symbol:"USDC",name:"USDC",decimals:6});
  assert.equal(decodeTokenMetadata({decimalsResult:"0x"+word(255)}).decimals,null);
 });
+test("expands relationship graph to two bounded hops",()=>{
+ const c="0x5555555555555555555555555555555555555555";
+ const d="0x6666666666666666666666666666666666666666";
+ const transfers=decodeTransferLogs([log(a,b,"0x0"),log(b,c,"0x1"),log(c,d,"0x2")],{chainId:"0x1"});
+ const one=buildLiveTransferGraph(transfers,{address:a,chainId:"0x1",hops:1});
+ const two=buildLiveTransferGraph(transfers,{address:a,chainId:"0x1",hops:2});
+ assert.equal(one.nodeCount,2);assert.equal(one.edgeCount,1);
+ assert.equal(two.nodeCount,3);assert.equal(two.edgeCount,2);assert.equal(two.hops,2);
+});
 test("rejects invalid addresses and edge bounds",()=>{
  assert.throws(()=>buildLiveTransferGraph([],{address:"bad",chainId:"0x1"}),/valid EVM address/);
  assert.throws(()=>buildLiveTransferGraph([],{address:a,chainId:"0x1",maxEdges:501}),/maxEdges/);
