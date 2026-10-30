@@ -9,12 +9,14 @@ import {buildInvestigationIntelligence} from "./investigation-intelligence.js";
 import {investigationPlaybookStorageKey} from "./investigation-playbook.js";
 import {hypothesisLedgerStorageKey,reconcileHypothesisLedger,recordHypothesisAssessment} from "./hypothesis-ledger.js";
 import {compareInvestigationSnapshots} from "./investigation-snapshot-diff.js";
+import {buildInvestigationMarkdownReport} from "./investigation-report.js";
 import {validateInvestigationDossier} from "./investigation-dossier-validation.js";
 const SVG="http://www.w3.org/2000/svg";
 const TYPE_LABELS={"observed-transaction-flow":"Transaction flow","observed-token-transfer-log":"Token transfer log","transaction-handoff":"Transaction handoff","shared-erc1967-implementation":"Shared ERC-1967 implementation","shared-erc1967-admin-slot":"Shared ERC-1967 admin slot","shared-erc1967-beacon":"Shared ERC-1967 beacon","shared-eip7702-delegation-target":"Shared EIP-7702 target"};
 const TYPE_COLORS={"correlation-graph":"#64d7e8","receipt-log":"#a78bfa","transaction-handoff":"#f6b95d","shared-infrastructure":"#e879b8"};
 function svgElement(name,attrs={},value){const el=document.createElementNS(SVG,name);for(const [key,val] of Object.entries(attrs))el.setAttribute(key,String(val));if(value!==undefined)el.textContent=String(value);return el;}
 function exportJson(data,filename){const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download=filename;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function exportText(value,filename,type="text/markdown;charset=utf-8"){const blob=new Blob([value],{type}),url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download=filename;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 async function exportSealedJson(data,filename){const sealed=await sealEvidenceArtifact(data);exportJson(sealed,filename);}
 function shortAddress(value){return value.slice(0,8)+"…"+value.slice(-6);}
 function typeLabel(type){return TYPE_LABELS[type]||type.replaceAll("-"," ");}
@@ -108,6 +110,18 @@ function renderInvestigationIntelligence(container,inputs){
  const exportLedger=document.createElement("button");exportLedger.type="button";exportLedger.textContent="EXPORT HYPOTHESIS REVIEW LEDGER ↓";
  exportLedger.addEventListener("click",()=>exportSealedJson(ledger,"sentinel-hypothesis-ledger-"+ledger.subject.chainId+"-"+ledger.subject.address+"-sealed.json").catch(error=>{storageWarning=error.message;}));
  const warning=document.createElement("p");warning.className="sentinel-playbook-warning";warning.textContent=storageWarning||"Analyst assessments are stored locally in this browser. Export the ledger to preserve a portable copy.";
+ const reportButton=document.createElement("button");reportButton.type="button";reportButton.textContent="EXPORT HUMAN-READABLE REPORT (.MD) ↓";
+ reportButton.addEventListener("click",()=>{
+  try{
+   let latestPlaybook=inputs.playbook;
+   try{const saved=JSON.parse(localStorage.getItem(investigationPlaybookStorageKey(inputs.neighborhood.subject))||"null");if(saved?.schema==="sentinel.investigation-playbook.v1")latestPlaybook=saved;}catch{}
+   let latestLedger=ledger;
+   try{const saved=JSON.parse(localStorage.getItem(storageKey)||"null");if(saved?.schema==="sentinel.hypothesis-ledger.v1")latestLedger=saved;}catch{}
+   const latest=buildInvestigationIntelligence({...inputs,playbook:latestPlaybook,hypothesisLedger:latestLedger,generatedAt:new Date().toISOString()});
+   const markdown=buildInvestigationMarkdownReport(latest);
+   exportText(markdown,"sentinel-investigation-report-"+latest.subject.chainId+"-"+latest.subject.address+".md");
+  }catch(error){const note=document.createElement("p");note.className="sentinel-playbook-warning";note.dataset.error="true";note.textContent=error.message;container.appendChild(note);}
+ });
  const evolution=document.createElement("section");evolution.className="sentinel-rel-compare";
  const evolutionTitle=document.createElement("h4");evolutionTitle.textContent="CASE EVOLUTION / SNAPSHOT COMPARISON";
  const evolutionText=document.createElement("p");evolutionText.textContent="Load a previous sealed dossier to compare imported evidence, hypothesis changes and analyst workflow against this current snapshot.";
@@ -139,7 +153,7 @@ function renderInvestigationIntelligence(container,inputs){
   }catch(error){evolutionResult.textContent=error.message;}
  });
  evolution.append(evolutionTitle,evolutionText,previousFile,compareSnapshots,evolutionResult);
- container.append(metrics,assessment,hypotheses,timeline,caveat,warning,exportButton,exportLedger,evolution);
+ container.append(metrics,assessment,hypotheses,timeline,caveat,warning,exportButton,exportLedger,reportButton,evolution);
 }
 
 export function mountEntityRelationshipExplorer(container,graph,threatIntelligence){
