@@ -106,3 +106,19 @@ No license has been granted yet. All rights reserved by default until a license 
 - This does **not** mean complete chain history: it covers the provider's indexed ERC-20 transfer records only. Native transfers, internal calls, arbitrary logs, NFTs, cross-chain activity and unindexed records are excluded. Public endpoint availability, CORS and rate limits may affect results.
 - Blockscout API reference: https://github.com/blockscout/blockscout-api-v2-swagger
 
+
+## Indexed Ethereum value-flow activity
+
+The Visualizer adds an **Indexed activity · ETH + internal · Ethereum** source alongside the ERC-20-only indexed history mode. It combines:
+- Provider-indexed ERC-20 transfer records.
+- Top-level transactions carrying non-zero native ETH value.
+- Successful internal transaction traces carrying non-zero native ETH value.
+
+Each record retains its transaction hash, block, direction, raw integer amount, record type and provider origin. Pagination is capped independently by endpoint and direction (8 pages per direction for ERC-20 history; 4 pages per direction for top-level and internal transactions). The UI reports whether all provider cursors were exhausted or a cap was reached.
+
+Important interpretation limits:
+- This remains a provider-indexed Ethereum-only view, not guaranteed complete chain history.
+- Zero-value contract interactions are not represented as value-flow edges.
+- Internal traces are execution-level subcalls and may coexist with their parent transaction; **do not sum internal traces as independent wallet balance changes**.
+- Failed internal traces are excluded from value-flow edges.
+- Token metadata and provider labels are not proof of ownership, legitimacy or risk.
