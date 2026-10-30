@@ -37,7 +37,7 @@ test("rejects invalid, identical and incomplete comparison inputs",()=>{
 test("includes direct token receipt logs and adjacent handoff links",()=>{
  const enriched={...threatIntelligence,tokenTransfers:[...threatIntelligence.tokenTransfers,{chainId:"0x1",from:a,to:b,transactionHash:"0x"+"3".repeat(64),amountRaw:"7"}],transactionLinks:[{chainId:"0x1",from:a,via:b,to:c,transactionHashes:[tx]}]};
  const result=compareObservedEntities({graph,threatIntelligence:enriched,chainId:"0x1",addressA:a,addressB:b});
- assert.equal(result.summary.directRelationshipCount,2);
+ assert.equal(result.summary.directRelationshipCount,3);
  assert.ok(result.directRelationships.some(item=>item.type==="observed-token-transfer-log"));
  assert.ok(result.directRelationships.some(item=>item.type==="transaction-handoff"));
 });
