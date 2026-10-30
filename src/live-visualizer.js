@@ -65,7 +65,7 @@ export function buildLiveTransferGraph(transfers, { address, chainId, scannedFro
       if (!frontier.has(edge.from) && !frontier.has(edge.to)) continue;
       const other = frontier.has(edge.from) ? edge.to : edge.from;
       if (!reachable.has(other)) {
-        if (reachable.size >= maxNodes) continue;
+        if (reachable.size + next.size >= maxNodes) continue;
         next.add(other);
       }
       candidates.set(edge.transactionHash + "|" + edge.logIndex, edge);
@@ -178,7 +178,7 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
   panel.className = "sentinel-live";
   panel.innerHTML = `
     <div class="sl-head"><div><div class="sl-kicker">SENTINEL / LIVE VISUALIZER</div><h2>Address relationship map</h2><p>Explore on-chain Transfer events around an address. Every edge links to its source transaction.</p></div><span class="sl-readonly">● READ ONLY</span></div>
-    <form class="sl-controls"><input name="address" spellcheck="false" autocomplete="off" placeholder="Paste an EVM wallet or contract address" aria-label="Address to trace" required><label>Block window <select name="window"><option value="500">500</option><option value="2000" selected>2,000</option><option value="5000">5,000</option><option value="10000">10,000</option></select></label><button type="submit">Trace address ↗</button></form>
+    <form class="sl-controls"><input name="address" spellcheck="false" autocomplete="off" placeholder="Paste an EVM wallet or contract address" aria-label="Address to trace" required><label>Block window <select name="window"><option value="500">500</option><option value="2000" selected>2,000</option><option value="5000">5,000</option><option value="10000">10,000</option></select></label><label>Graph depth <select name="hops"><option value="1" selected>1 hop</option><option value="2">2 hops</option></select></label><button type="submit">Trace address ↗</button></form>
     <div class="sl-meta" data-role="status">Choose an address to build a live relationship map from recent ERC-20 Transfer logs.</div>
     <div class="sl-stats" data-role="stats"></div>
     <div class="sl-layout"><div class="sl-canvas" data-role="canvas"><div class="sl-empty">Your graph will appear here</div></div><aside class="sl-inspector" data-role="inspector"><span class="sl-kicker">NODE INSPECTOR</span><strong>Select a node</strong><p>Address details and observed transfer evidence will appear here.</p></aside></div>
@@ -254,12 +254,29 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
         }catch(error){lastError=error;if(attempt===3||windowBlocks<=64)break;windowBlocks=Math.max(64,Math.floor(windowBlocks/2));}
       }
       if(lastError)throw new Error("RPC could not scan the requested window: "+lastError.message);
-      const transfers=decodeTransferLogs(logs,{chainId:network.chainId});
+      const requestedHops = Number(form.elements.hops.value);
       const from=latest>BigInt(windowBlocks)?latest-BigInt(windowBlocks):0n;
-      const graph=buildLiveTransferGraph(transfers,{address,chainId:network.chainId,scannedFrom:from.toString(),scannedTo:latest.toString(),maxEdges:160});
+      let allLogs = logs.slice(), expansionFailures = 0, expandedAddresses = 0;
+      const rootTransfers = decodeTransferLogs(logs,{chainId:network.chainId});
+      if (requestedHops === 2) {
+        const peers = [...new Set(rootTransfers.map(edge => edge.from === address ? edge.to : edge.from).filter(peer => peer !== address))].slice(0,8);
+        const expanded = await Promise.allSettled(peers.map(async peer => {
+          const [sent,received] = await Promise.all([
+            rpc("eth_getLogs",[{fromBlock:"0x"+from.toString(16),toBlock:latestHex,topics:[ERC20_TRANSFER_TOPIC,addressTopic(peer)]}]),
+            rpc("eth_getLogs",[{fromBlock:"0x"+from.toString(16),toBlock:latestHex,topics:[ERC20_TRANSFER_TOPIC,null,addressTopic(peer)]}])
+          ]);
+          return [...(sent||[]),...(received||[])];
+        }));
+        for (const result of expanded) {
+          if (result.status === "fulfilled") { allLogs.push(...result.value); expandedAddresses++; }
+          else expansionFailures++;
+        }
+      }
+      const transfers=decodeTransferLogs(allLogs,{chainId:network.chainId});
+      const graph=buildLiveTransferGraph(transfers,{address,chainId:network.chainId,scannedFrom:from.toString(),scannedTo:latest.toString(),hops:requestedHops,maxEdges:160,maxNodes:40});
       tokenMetadata = await fetchMetadataBatch(graph.edges.map(edge => edge.token), rpc);
       render(graph);
-      status.textContent=network.name+" · provider "+network.rpc+" · scanned "+windowBlocks.toLocaleString()+" blocks · queried "+new Date().toISOString();
+      status.textContent=network.name+" · "+requestedHops+" hop(s) · scanned "+windowBlocks.toLocaleString()+" blocks · expanded "+expandedAddresses+"/8 counterparties"+(expansionFailures?" · "+expansionFailures+" expansion queries failed":"")+" · "+new Date().toISOString();
     }catch(error){canvas.innerHTML='<div class="sl-empty sl-error">'+esc(error.message)+'</div>';status.textContent="Live trace failed. The provider may limit eth_getLogs range or availability.";status.classList.add("sl-error");}
     finally{form.querySelector("button").disabled=false;form.querySelector("button").textContent="Trace address ↗";}
   });
