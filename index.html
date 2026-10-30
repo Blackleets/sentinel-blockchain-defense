@@ -176,28 +176,286 @@ button{touch-action:manipulation}
  *,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}
 }
 
+
+/* SENTINEL command-centre visual system */
+:root{--bg:#070b10;--surface:#0b121a;--surface2:#0e1923;--line:#1d303d;--line2:#294553;--ink:#e8f0f2;--muted:#81949e;--faint:#50646f;--acid:#c5ef72;--cyan:#78c8d0;--orange:#e0a66a}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:90px}
+body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.55 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.005em}
+button,input,select{font:inherit}
+.sentinel-app{min-height:100vh;display:grid;grid-template-columns:246px minmax(0,1fr);background:radial-gradient(ellipse at 70% -20%,rgba(43,92,103,.16),transparent 40%),#070b10}
+.sidebar{height:100vh;position:sticky;top:0;display:flex;flex-direction:column;padding:27px 16px 18px 18px;background:#080e14;border-right:1px solid #1b2b35;z-index:30}
+.side-brand{display:flex;align-items:center;gap:12px;padding:0 7px 34px;text-decoration:none;color:var(--ink)}
+.brand-glyph{width:39px;height:39px;display:grid;place-items:center;border:1px solid #56716a;color:var(--acid);font:700 19px/1 ui-monospace,monospace;background:linear-gradient(145deg,#15241f,#0c1718);clip-path:polygon(0 0,100% 0,100% 78%,78% 100%,0 100%)}
+.side-brand b{display:block;font:700 16px/1.2 ui-monospace,monospace;letter-spacing:.2em}
+.side-brand small{display:block;color:#758890;font:9px/1.6 ui-monospace,monospace;letter-spacing:.12em}
+.side-section-label,.section-index{font:9px/1.4 ui-monospace,monospace;color:#71858d;letter-spacing:.16em}
+.side-section-label{padding:0 10px 11px}
+.side-nav{display:grid;gap:4px}
+.side-link{display:grid;grid-template-columns:22px minmax(0,1fr) auto;align-items:center;gap:10px;padding:11px 10px;border:1px solid transparent;border-radius:5px;color:#92a3a8;text-decoration:none;font-size:11px;transition:.18s}
+.side-icon{font-size:16px;color:#7e9694;text-align:center}
+.side-link kbd{font:9px ui-monospace,monospace;color:#53656d}
+.side-link:hover{background:#101b21;color:#dce7e4}
+.side-link.active{background:linear-gradient(90deg,rgba(160,205,113,.11),rgba(160,205,113,.015));border-color:#344b3d;color:#e4efdd}
+.side-link.active .side-icon{color:var(--acid)}
+.side-link.active kbd{color:#9ebc77}
+.sidebar-bottom{margin-top:auto}
+.network-chip{display:flex;align-items:center;gap:9px;padding:9px 10px;color:#9aabae;font-size:10px;border-bottom:1px solid rgba(38,57,66,.55)}
+.network-chip i{width:6px;height:6px;border-radius:50%;background:#91b78a;box-shadow:0 0 9px #91b78a}
+.network-chip small{margin-left:auto;font:8px ui-monospace,monospace;color:#64777e}
+.sidebar-foot{margin:19px 5px 0;padding-top:13px;border-top:1px solid #1b2c34;font:8px ui-monospace,monospace;letter-spacing:.08em;color:#7c8f92;white-space:nowrap}
+.sidebar-foot b{float:right;color:#596d72;font-weight:500}
+.live-dot{display:inline-block;width:6px;height:6px;margin-right:7px;border-radius:50%;background:var(--acid)}
+.workspace{width:100%;max-width:1700px;margin:0 auto;padding:0 clamp(22px,3vw,48px) 34px;min-width:0}
+.topbar{height:62px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #1a2a34}
+.breadcrumb{display:flex;align-items:center;gap:10px;font:9px ui-monospace,monospace;letter-spacing:.15em;color:#73868d}
+.breadcrumb b{color:#3f535d;font-weight:400}.breadcrumb strong{color:#b8c7c5;font-weight:600}
+.topbar-right{display:flex;align-items:center;gap:14px}
+.secure-label{font:8px ui-monospace,monospace;letter-spacing:.1em;color:#91a59e}
+.secure-label i{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--acid);margin-right:7px;vertical-align:1px}
+.operator-mark{width:27px;height:27px;display:grid;place-items:center;border:1px solid #344c51;color:var(--acid);font:11px ui-monospace,monospace}
+.hero{padding:35px 0 25px;border-bottom:1px solid #1a2b34}
+.hero-meta{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.eyebrow{font:9px ui-monospace,monospace;letter-spacing:.18em;color:var(--acid)}
+.build-label{font:8px ui-monospace,monospace;letter-spacing:.14em;color:#53676f}
+.hero-main{display:flex;justify-content:space-between;align-items:flex-end;gap:25px;margin-top:16px}
+.hero h1{font-size:clamp(36px,4.5vw,57px);font-weight:540;letter-spacing:-.065em;line-height:.99;margin:0;color:#e8efed}
+.hero h1 em{font-style:normal;color:#a6c77e}
+.hero p{max-width:570px;color:#85979b;font-size:12px;line-height:1.75;margin:14px 0 0}
+.hero-stamp{min-width:185px;padding:12px 15px;border-left:1px solid #50644c;background:linear-gradient(90deg,rgba(169,203,124,.07),transparent)}
+.hero-stamp span,.hero-stamp small{display:block;font:8px ui-monospace,monospace;letter-spacing:.12em;color:#81927c}
+.hero-stamp strong{display:block;margin:6px 0;color:#c2df91;font:700 14px/1.3 ui-monospace,monospace;letter-spacing:.08em}
+.hero-stamp small{color:#687c76;letter-spacing:0}
+.overview-grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(290px,.85fr);gap:13px;margin-top:18px}
+.panel{background:linear-gradient(145deg,rgba(14,25,34,.98),rgba(10,17,24,.99));border:1px solid #223640;border-radius:7px;padding:19px;min-width:0;box-shadow:0 12px 30px rgba(0,0,0,.13)}
+.panel-topline{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:17px}
+.section-index{color:#82968e}
+.read-only-tag{font:8px ui-monospace,monospace;letter-spacing:.1em;color:#a9c78b;border:1px solid #354d3b;padding:5px 7px;border-radius:2px}
+.panel h2{margin:0;color:#e2ece8;font-size:16px;font-weight:560;letter-spacing:-.02em}
+.sub{margin:5px 0 17px;color:#81939a;font-size:11px;line-height:1.65}
+.searchrow{display:grid;grid-template-columns:170px minmax(0,1fr) auto;gap:7px}
+.searchrow input,.searchrow select,.graph-controls input,.graph-controls select{min-width:0;width:100%;height:43px;padding:0 12px;border:1px solid #2a414b;border-radius:3px;background:#070e14;color:#dce8e4;font:10px ui-monospace,monospace;letter-spacing:.02em;outline:none}
+.searchrow select{color:#b7c8c1}
+.searchrow input::placeholder{color:#52666c}
+.searchrow input:focus,.searchrow select:focus,.graph-controls input:focus{border-color:#9bbd77;box-shadow:0 0 0 2px rgba(169,203,124,.08)}
+.searchrow button,.case-import-row button{height:43px;padding:0 15px;border:1px solid #8eaa68;border-radius:3px;background:#a9c77b;color:#111a14;font:700 9px ui-monospace,monospace;letter-spacing:.06em;white-space:nowrap}
+.searchrow button:hover,.case-import-row button:hover{background:#c4df93;transform:none}
+.searchrow button span{font-size:14px;margin-left:8px}
+.search-foot{display:flex;justify-content:space-between;gap:8px;margin-top:12px;color:#62777d;font:8px ui-monospace,monospace;letter-spacing:.06em}
+.search-foot i{display:inline-block;width:5px;height:5px;background:#9ab97b;border-radius:50%;margin-right:6px}
+.error{color:#f08c86;font-size:11px;margin-top:10px}
+.coverage-panel{background:linear-gradient(145deg,#101b20,#0b141a)}
+.coverage-mark{color:var(--acid);font-size:10px}
+.coverage-list{display:grid;margin-top:5px}
+.coverage-list>div{display:grid;grid-template-columns:54px minmax(0,1fr) auto;align-items:center;gap:10px;padding:10px 0;border-top:1px solid #20323a}
+.coverage-number{color:#d3e4c0;font:17px ui-monospace,monospace;letter-spacing:-.08em}
+.coverage-list b{display:block;color:#d2dfd9;font-size:10px;font-weight:550}
+.coverage-list small{display:block;color:#6f858a;font-size:9px;margin-top:2px}
+.coverage-list i{font:7px ui-monospace,monospace;font-style:normal;letter-spacing:.08em;color:#9fbc82}
+.coverage-note{display:flex;gap:9px;margin-top:12px;padding:9px 10px;background:#111b1c;border:1px solid #2a3b31;color:#87968a;font-size:9px;line-height:1.5}
+.coverage-note span{color:var(--acid);font-weight:700}
+.section-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin:29px 0 12px;scroll-margin-top:20px}
+.section-heading h2{margin:5px 0 2px;font-size:21px;font-weight:540;letter-spacing:-.04em}
+.section-heading p{margin:0;color:#7d9096;font-size:10px}
+.section-side-note{font:8px ui-monospace,monospace;letter-spacing:.12em;color:#61777d}
+#live-visualizer{scroll-margin-top:18px;min-width:0}
+#live-visualizer .sl-panel,#live-visualizer .ec-panel{margin-top:13px}
+.case-workspace{margin-top:28px;scroll-margin-top:20px}
+.case-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:15px}
+.case-heading .sub{max-width:680px}
+.case-index{border:1px solid #334a4b;padding:7px 11px;color:#8ca19b;font:8px ui-monospace,monospace;letter-spacing:.14em;text-align:center}
+.case-index b{color:var(--acid);font-size:13px}
+.case-import-row{display:grid;grid-template-columns:minmax(160px,.8fr) minmax(0,1.8fr) auto;gap:10px;align-items:center;padding:13px;border:1px dashed #354b50;background:rgba(4,11,15,.45)}
+.import-copy b{display:block;color:#d4e0db;font-size:10px;font-weight:600}
+.import-copy small{display:block;color:#71858a;font-size:9px;margin-top:3px}
+.case-import-row input[type=file]{min-width:0;color:#7e9396;font-size:9px}
+.case-import-row input::file-selector-button{border:1px solid #344a4f;background:#111d23;color:#c1d0c9;padding:7px 9px;margin-right:8px;font:9px ui-monospace,monospace}
+.threshold-settings{margin-top:12px;border-top:1px solid #1d3038;border-bottom:1px solid #1d3038}
+.threshold-settings summary{padding:11px 0;color:#91a29f;font-size:10px;cursor:pointer;list-style:none}
+.threshold-settings summary::-webkit-details-marker{display:none}
+.threshold-settings summary:after{content:"＋";float:right;color:var(--acid)}
+.threshold-settings[open] summary:after{content:"−"}
+.threshold-settings summary span{float:right;margin-right:16px;color:#637c78;font:8px ui-monospace,monospace;letter-spacing:.1em}
+.threshold-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:5px 0 13px}
+.threshold-grid label{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#7f9294;font-size:9px}
+.threshold-grid input{width:90px;height:34px;padding:0 7px;font-size:10px}
+.notice{margin-top:17px;padding:11px 13px;border:1px solid #3c3d30;background:#111713;color:#8f9c8b;border-radius:3px;font-size:9px;line-height:1.7}
+.notice strong{color:#c2cf9c;font:8px ui-monospace,monospace;letter-spacing:.1em;margin-right:8px}
+.footer{display:flex;justify-content:space-between;gap:10px;margin-top:21px;padding-top:13px;border-top:1px solid #1b2b33;color:#60747a;font:8px ui-monospace,monospace;letter-spacing:.12em}
+.result{margin-top:16px}.result.show{display:block}
+.kv{display:grid;grid-template-columns:140px minmax(0,1fr);gap:9px;padding:9px 0;border-bottom:1px solid #1b3038}
+.kv span:first-child{color:#82959a;font-size:10px}.kv code{overflow-wrap:anywhere;color:#d4e3dc;font-size:10px}
+.pill{display:inline-flex;padding:3px 8px;border-radius:2px;font:8px ui-monospace,monospace;letter-spacing:.08em;border:1px solid #344a4e;color:#9fb0a9}
+.metric{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.metric div{padding:12px;border:1px solid #243840;background:#091218}
+.metric strong{display:block;color:#d6e4d5;font:19px ui-monospace,monospace}.metric small{color:#758a8e;font-size:9px}
+.stack{display:grid;gap:13px}
+.feed{display:grid;gap:10px}.feeditem{border-left:1px solid #829f69;padding:1px 0 1px 11px}.feeditem b{font-size:10px;color:#c7d5cf}.feeditem p{margin:3px 0 0;color:#74888d;font-size:9px}
+.graph-controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.graph-summary{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0}
+.graph-summary span{padding:7px 9px;border:1px solid #293e45;background:#0a1419;color:#91a29d;font:9px ui-monospace,monospace}
+.graph-list{display:grid;gap:7px;margin-top:10px}
+.graph-edge{padding:11px;border:1px solid #253a41;background:#0a1419;border-radius:3px}
+.graph-edge b{display:block;color:#b8d88a;font-size:10px}.graph-edge code{display:block;overflow-wrap:anywhere;color:#c6d7d2;font-size:10px;margin-top:5px}.graph-edge small{display:block;color:#819398;font-size:9px;margin-top:5px}
+.empty{padding:16px;border:1px dashed #2b4045;color:#7f9394;font-size:10px;line-height:1.6}
+.hint{color:#75888d;font-size:9px;line-height:1.6}
+#live-visualizer .sl-panel,#live-visualizer .ec-panel{background:linear-gradient(145deg,#0e1921,#091117)!important;border:1px solid #273e47!important;border-radius:5px!important;box-shadow:none!important}
+#live-visualizer h2,#live-visualizer h3{letter-spacing:-.02em}
+#live-visualizer button{border-radius:3px}
+#live-visualizer input,#live-visualizer select{border-radius:3px}
+@media(max-width:1100px){.sentinel-app{grid-template-columns:205px minmax(0,1fr)}.sidebar{padding-left:12px;padding-right:12px}.workspace{padding-left:20px;padding-right:20px}.overview-grid{grid-template-columns:minmax(0,1.25fr) minmax(270px,.85fr)}.searchrow{grid-template-columns:145px minmax(0,1fr)}.searchrow button{grid-column:2}}
+@media(max-width:760px){
+ .sentinel-app{display:block}
+ .sidebar{position:sticky;top:0;height:auto;padding:9px 12px 8px;border-right:0;border-bottom:1px solid #263a40;background:rgba(7,13,18,.97);backdrop-filter:blur(14px)}
+ .side-brand{padding:0 3px 9px}
+ .brand-glyph{width:29px;height:29px;font-size:15px}
+ .side-brand b{font-size:13px}.side-brand small{font-size:7px}
+ .side-section-label,.sidebar-bottom{display:none}
+ .side-nav{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;padding-bottom:1px}
+ .side-nav::-webkit-scrollbar{display:none}
+ .side-link{display:flex;gap:7px;flex:0 0 auto;padding:8px 10px;font-size:9px;white-space:nowrap;border:1px solid #263b40;background:#0b151b}
+ .side-link kbd{display:none}
+ .side-icon{font-size:12px}
+ .workspace{padding:0 13px 25px}
+ .topbar{height:44px}
+ .secure-label{font-size:7px}
+ .operator-mark{width:23px;height:23px}
+ .hero{padding:24px 0 18px}
+ .hero-main{align-items:flex-start}
+ .hero h1{font-size:clamp(34px,8vw,46px)}
+ .hero p{font-size:11px;max-width:420px}
+ .hero-stamp{min-width:118px;padding:8px 9px}
+ .hero-stamp strong{font-size:10px}
+ .hero-stamp span,.hero-stamp small{font-size:7px}
+ .overview-grid{grid-template-columns:1fr;gap:10px;margin-top:12px}
+ .panel{padding:14px;border-radius:5px}
+ .panel-topline{margin-bottom:12px}
+ .panel h2{font-size:15px}
+ .searchrow{grid-template-columns:1fr;gap:7px}
+ .searchrow select,.searchrow input,.searchrow button{grid-column:auto;height:46px;font-size:11px}
+ .search-foot{font-size:7px;flex-wrap:wrap}
+ .coverage-list>div{padding:8px 0}
+ .section-heading{margin-top:23px;align-items:flex-start}
+ .section-heading h2{font-size:19px}
+ .section-side-note{display:none}
+ .case-workspace{margin-top:20px}
+ .case-import-row{grid-template-columns:1fr;gap:9px}
+ .case-import-row input{min-height:36px}
+ .case-import-row button{width:100%;height:44px}
+ .threshold-grid{grid-template-columns:1fr 1fr}
+ .kv{grid-template-columns:minmax(90px,31%) minmax(0,1fr)}
+ .footer{font-size:7px}
+}
+@media(max-width:420px){
+ .workspace{padding-left:10px;padding-right:10px}
+ .hero-meta{align-items:flex-start}
+ .build-label{font-size:7px}
+ .hero-main{display:block}
+ .hero-stamp{display:none}
+ .hero h1{font-size:36px}
+ .topbar-right{gap:7px}
+ .secure-label{max-width:180px;text-align:right;line-height:1.4}
+ .coverage-list>div{grid-template-columns:48px minmax(0,1fr) auto;gap:7px}
+ .coverage-number{font-size:15px}
+ .coverage-list i{font-size:6px}
+ .threshold-grid{grid-template-columns:1fr}
+ .kv{grid-template-columns:1fr;gap:3px}
+}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{transition:none!important;animation:none!important}}
+
 </style>
 </head>
-<body><main class="shell">
-<header class="top"><div class="brand"><div class="mark">⌁</div><div><b>SENTINEL</b><small>BLOCKCHAIN DEFENSE INTELLIGENCE</small></div></div><div class="status">● SYSTEM READY · READ ONLY</div></header>
-<nav class="sentinel-nav" aria-label="Workspace navigation">
-  <a href="#workspace-home"><span>01</span> Overview</a>
-  <a href="#lookup"><span>02</span> Address search</a>
-  <a href="#live-visualizer"><span>03</span> Visualizer</a>
-  <a href="#case-workspace"><span>04</span> Investigations</a>
-</nav>
-<section class="hero" id="workspace-home"><div class="eyebrow">MULTICHAIN EVM SECURITY WORKSPACE</div><h1>See the signal.<br>Understand the risk.</h1><p>Inspect on-chain accounts, transactions and delegated code with transparent evidence. No wallet connection. No signatures. No funds movement.</p></section>
-<section class="grid">
-<div class="panel"><h2>On-chain inspector</h2><p class="sub">Enter an Ethereum address or transaction hash. Live reads are fetched from a public RPC endpoint.</p><form id="lookup" class="searchrow"><select id="network" aria-label="Select blockchain"><option value="ethereum">Ethereum Mainnet · ETH</option><option value="bnb">BNB Smart Chain · BNB</option><option value="polygon">Polygon PoS · POL</option></select><input id="target" autocomplete="off" spellcheck="false" placeholder="0x… address or transaction hash" aria-label="Blockchain address or transaction hash" required><button id="inspect" type="submit">Inspect →</button></form><div class="hint">Read-only RPC · Chain ID verified before inspection</div><div id="error" class="error" role="alert"></div><div id="result" class="result" aria-live="polite"></div></div>
-<aside class="stack">
-<div class="panel"><h2>Inspection coverage</h2><p class="sub">Current capabilities</p><div class="metric"><div><strong>01</strong><small>Ethereum Mainnet</small></div><div><strong>7702</strong><small>Delegation detector</small></div><div><strong>0</strong><small>Wallet permissions</small></div><div><strong>100%</strong><small>Read-only actions</small></div></div></div>
-<div class="panel"><h2>Security principles</h2><div class="feed"><div class="feeditem"><b>Evidence before verdict</b><p>Every result is tied to RPC data and a block number where available.</p></div><div class="feeditem"><b>Delegation-aware</b><p>Detects the EIP-7702 designator prefix in account code.</p></div><div class="feeditem"><b>No transaction execution</b><p>Sentinel never requests private keys or signs transactions.</p></div></div></div>
-</aside></section>
-<section id="live-visualizer" aria-label="Live blockchain relationship visualizer"></section>
-<section class="panel case-workspace" id="case-workspace" style="margin-top:16px"><h2>Investigation graph</h2><p class="sub">Import case evidence JSON files to correlate infrastructure and inspect recurring transaction patterns, proxy reuse and upgrade bursts. Configure thresholds below. Processing stays in this browser.</p><div class="graph-controls"><input id="case-files" type="file" accept=".json,application/json" multiple aria-label="Import SENTINEL case evidence JSON files"><button id="build-graph" type="button">Analyze evidence →</button></div><div class="graph-controls" style="margin-top:10px"><label class="hint">Repeated sender/recipient cases <input id="rule-repeat" type="number" min="1" max="100" value="2" style="width:64px"></label><label class="hint">Shared proxy cases <input id="rule-proxy" type="number" min="1" max="100" value="2" style="width:64px"></label><label class="hint">Upgrade events <input id="rule-upgrades" type="number" min="1" max="100" value="2" style="width:64px"></label><label class="hint">Upgrade window (blocks) <input id="rule-window" type="number" min="1" max="1000000" value="7200" style="width:90px"></label><label class="hint">Sender burst events <input id="rule-sender-burst" type="number" min="2" max="100" value="3" style="width:64px"></label><label class="hint">Sender burst window <input id="rule-sender-window" type="number" min="1" max="1000000" value="7200" style="width:90px"></label></div><div id="graph-error" class="error" role="alert"></div><div id="graph-output" aria-live="polite"><div class="empty">No cases loaded. Export evidence JSON from an inspection, then import two or more reports to find shared on-chain references.</div></div></section>
-<div class="notice">Early release: this inspector is a defensive research aid, not an audit or guarantee of safety. A delegation marker alone does not prove malicious intent.</div>
-<footer class="footer"><span> S E N T I N E L &nbsp; / &nbsp; SECURITY RESEARCH</span><span id="clock">Waiting for first query</span></footer>
-</main>
+<body>
+<div class="sentinel-app">
+  <aside class="sidebar" aria-label="Primary navigation">
+    <a class="side-brand" href="#workspace-home" aria-label="SENTINEL home">
+      <span class="brand-glyph">S</span>
+      <span><b>SENTINEL</b><small>ON-CHAIN INTELLIGENCE</small></span>
+    </a>
+    <div class="side-section-label">WORKSPACE</div>
+    <nav class="side-nav">
+      <a class="side-link active" href="#workspace-home"><span class="side-icon">⌂</span><span>Command overview</span><kbd>01</kbd></a>
+      <a class="side-link" href="#lookup"><span class="side-icon">⌕</span><span>Address intelligence</span><kbd>02</kbd></a>
+      <a class="side-link" href="#live-visualizer"><span class="side-icon">⌘</span><span>Relationship graph</span><kbd>03</kbd></a>
+      <a class="side-link" href="#case-workspace"><span class="side-icon">▤</span><span>Case laboratory</span><kbd>04</kbd></a>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="side-section-label">NETWORK SCOPE</div>
+      <div class="network-chip"><i></i><span>Ethereum</span><small>MAINNET</small></div>
+      <div class="network-chip"><i></i><span>BNB Chain</span><small>RPC</small></div>
+      <div class="network-chip"><i></i><span>Polygon</span><small>RPC</small></div>
+      <div class="sidebar-foot"><span class="live-dot"></span> READ-ONLY ENVIRONMENT <b>v0.4</b></div>
+    </div>
+  </aside>
+
+  <main class="workspace">
+    <header class="topbar">
+      <div class="breadcrumb"><span>INTELLIGENCE</span><b>/</b><strong>OVERVIEW</strong></div>
+      <div class="topbar-right"><span class="secure-label"><i></i> NO SIGNING · NO WALLET ACCESS</span><span class="operator-mark">S</span></div>
+    </header>
+
+    <section class="hero" id="workspace-home">
+      <div class="hero-meta"><span class="eyebrow">SENTINEL / INVESTIGATION ENVIRONMENT</span><span class="build-label">FIELD SYSTEM 001</span></div>
+      <div class="hero-main">
+        <div><h1>Follow the evidence.<br><em>Not the noise.</em></h1><p>Trace on-chain behavior across supported EVM networks. Every observation carries its source, scope and limitations.</p></div>
+        <div class="hero-stamp"><span>CORE PRINCIPLE</span><strong>OBSERVED<br>≠ INFERRED</strong><small>Evidence before attribution</small></div>
+      </div>
+    </section>
+
+    <section class="overview-grid">
+      <div class="panel search-panel">
+        <div class="panel-topline"><span class="section-index">01 / TARGET ACQUISITION</span><span class="read-only-tag">LIVE RPC · READ ONLY</span></div>
+        <h2>Inspect an entity</h2>
+        <p class="sub">Resolve an EVM address or transaction hash against a chain-verified RPC endpoint.</p>
+        <form id="lookup" class="searchrow">
+          <select id="network" aria-label="Select blockchain"><option value="ethereum">ETHEREUM MAINNET</option><option value="bnb">BNB SMART CHAIN</option><option value="polygon">POLYGON POS</option></select>
+          <input id="target" autocomplete="off" spellcheck="false" placeholder="Paste address or transaction hash · 0x…" aria-label="Blockchain address or transaction hash" required>
+          <button id="inspect" type="submit">RUN INSPECTION <span>↗</span></button>
+        </form>
+        <div class="search-foot"><span><i></i> Chain ID verified before inspection</span><span>NO PRIVATE KEY REQUIRED</span></div>
+        <div id="error" class="error" role="alert"></div><div id="result" class="result" aria-live="polite"></div>
+      </div>
+      <aside class="panel coverage-panel">
+        <div class="panel-topline"><span class="section-index">02 / ENGINE COVERAGE</span><span class="coverage-mark">●</span></div>
+        <h2>Current capabilities</h2>
+        <p class="sub">Validated inspection surface</p>
+        <div class="coverage-list">
+          <div><span class="coverage-number">03</span><span><b>EVM networks</b><small>Ethereum · BNB · Polygon</small></span><i>ACTIVE</i></div>
+          <div><span class="coverage-number">7702</span><span><b>Delegation analysis</b><small>Account code inspection</small></span><i>ENABLED</i></div>
+          <div><span class="coverage-number">1967</span><span><b>Proxy intelligence</b><small>Storage slots + event history</small></span><i>ENABLED</i></div>
+          <div><span class="coverage-number">RO</span><span><b>Execution policy</b><small>No signing or transaction broadcast</small></span><i>LOCKED</i></div>
+        </div>
+        <div class="coverage-note"><span>!</span> Coverage describes implemented inspection capabilities, not network-wide monitoring.</div>
+      </aside>
+    </section>
+
+    <section class="section-heading" id="live-visualizer">
+      <div><span class="section-index">03 / RELATIONSHIP ANALYSIS</span><h2>Transaction topology</h2><p>Build a bounded view of observed transfer relationships around a target address.</p></div>
+      <span class="section-side-note">SOURCE-AWARE GRAPH / EVM</span>
+    </section>
+
+    <section class="panel case-workspace" id="case-workspace">
+      <div class="panel-topline"><span class="section-index">04 / CASE CORRELATION LAB</span><span class="read-only-tag">LOCAL EVIDENCE PROCESSING</span></div>
+      <div class="case-heading"><div><h2>Correlate investigations</h2><p class="sub">Import SENTINEL evidence reports to identify shared infrastructure, transaction patterns and recurring on-chain references.</p></div><div class="case-index">CASE<br><b>LAB</b></div></div>
+      <div class="case-import-row"><div class="import-copy"><b>Evidence package</b><small>JSON reports · max 250 files · 5 MiB each</small></div><input id="case-files" type="file" accept=".json,application/json" multiple aria-label="Import SENTINEL case evidence JSON files"><button id="build-graph" type="button">CORRELATE EVIDENCE ↗</button></div>
+      <details class="threshold-settings"><summary>Correlation rule thresholds <span>CONFIGURE</span></summary>
+        <div class="graph-controls threshold-grid">
+          <label class="hint">Repeated sender / recipient <input id="rule-repeat" type="number" min="1" max="100" value="2"></label>
+          <label class="hint">Shared proxy cases <input id="rule-proxy" type="number" min="1" max="100" value="2"></label>
+          <label class="hint">Upgrade events <input id="rule-upgrades" type="number" min="1" max="100" value="2"></label>
+          <label class="hint">Upgrade window (blocks) <input id="rule-window" type="number" min="1" max="1000000" value="7200"></label>
+          <label class="hint">Sender burst events <input id="rule-sender-burst" type="number" min="2" max="100" value="3"></label>
+          <label class="hint">Sender burst window <input id="rule-sender-window" type="number" min="1" max="1000000" value="7200"></label>
+        </div>
+      </details>
+      <div id="graph-error" class="error" role="alert"></div>
+      <div id="graph-output" aria-live="polite"><div class="empty">Awaiting evidence. Export a case report from an address inspection, then import reports here to discover shared on-chain references.</div></div>
+    </section>
+
+    <div class="notice"><strong>RESEARCH LIMITATION</strong> SENTINEL is an evidence-led defensive research tool, not an audit or guarantee of safety. A delegation marker, shared address or observed transfer does not independently establish malicious intent or common ownership.</div>
+    <footer class="footer"><span>SENTINEL / SECURITY RESEARCH</span><span id="clock">AWAITING FIRST QUERY</span></footer>
+  </main>
+</div>
 <script type="module">
 import { inspectDelegationCode } from "./src/eip7702.js";
 import { analyzeBytecode } from "./src/bytecode.js";
