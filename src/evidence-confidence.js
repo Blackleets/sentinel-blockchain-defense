@@ -96,7 +96,7 @@ export function buildEvidenceConfidenceAssessment(verification) {
   const unique = asCount(verification.coverage.uniqueTransactionReferences);
   const notChecked = asCount(verification.coverage.notChecked);
   const coverageComplete = verification.coverage.truncated === false &&
-    checked !== null && unique !== null && notChecked === 0 && checked === unique;
+    checked !== null && unique !== null && unique > 0 && notChecked === 0 && checked === unique;
 
   const checks = [
     check(
