@@ -10,6 +10,7 @@ import {investigationPlaybookStorageKey} from "./investigation-playbook.js";
 import {hypothesisLedgerStorageKey,reconcileHypothesisLedger,recordHypothesisAssessment} from "./hypothesis-ledger.js";
 import {compareInvestigationSnapshots} from "./investigation-snapshot-diff.js";
 import {buildInvestigationMarkdownReport} from "./investigation-report.js";
+import {createCaseVault,createIndexedDbCaseVaultStore} from "./case-vault.js";
 import {validateInvestigationDossier} from "./investigation-dossier-validation.js";
 const SVG="http://www.w3.org/2000/svg";
 const TYPE_LABELS={"observed-transaction-flow":"Transaction flow","observed-token-transfer-log":"Token transfer log","transaction-handoff":"Transaction handoff","shared-erc1967-implementation":"Shared ERC-1967 implementation","shared-erc1967-admin-slot":"Shared ERC-1967 admin slot","shared-erc1967-beacon":"Shared ERC-1967 beacon","shared-eip7702-delegation-target":"Shared EIP-7702 target"};
@@ -155,7 +156,62 @@ function renderInvestigationIntelligence(container,inputs){
   }catch(error){evolutionResult.textContent=error.message;}
  });
  evolution.append(evolutionTitle,evolutionText,previousFile,compareSnapshots,evolutionResult);
- container.append(metrics,assessment,hypotheses,timeline,caveat,warning,exportButton,exportLedger,reportButton,evolution);
+ const vaultPanel=document.createElement("section");vaultPanel.className="sentinel-rel-compare";
+ const vaultTitle=document.createElement("h4");vaultTitle.textContent="LOCAL CASE VAULT / SNAPSHOT ARCHIVE";
+ const vaultDescription=document.createElement("p");vaultDescription.textContent="Save integrity-sealed dossier snapshots in this browser's IndexedDB. Nothing is uploaded. Browser storage can be cleared, so keep independent exports for important cases.";
+ const vaultToolbar=document.createElement("div");vaultToolbar.className="sentinel-playbook-toolbar";
+ const saveSnapshot=document.createElement("button");saveSnapshot.type="button";saveSnapshot.textContent="ARCHIVE CURRENT SNAPSHOT ↓";
+ const refreshVault=document.createElement("button");refreshVault.type="button";refreshVault.textContent="REFRESH ARCHIVE";
+ const savedSnapshots=document.createElement("select");savedSnapshots.setAttribute("aria-label","Saved case snapshots");savedSnapshots.style.minWidth="0";savedSnapshots.style.width="100%";
+ const compareArchived=document.createElement("button");compareArchived.type="button";compareArchived.textContent="COMPARE ARCHIVED SNAPSHOT ↗";
+ const vaultResult=document.createElement("p");vaultResult.className="sentinel-playbook-warning";vaultResult.setAttribute("aria-live","polite");vaultResult.textContent="Local archive not loaded yet.";
+ vaultToolbar.append(saveSnapshot,refreshVault);
+ let vaultPromise;
+ const getVault=()=>vaultPromise||(vaultPromise=Promise.resolve().then(()=>createCaseVault({store:createIndexedDbCaseVaultStore(),verifySeal:verifyEvidenceArtifactSeal,validateDossier:validateInvestigationDossier})));
+ const refreshArchive=async()=>{
+  try{
+   const vault=await getVault(),records=await vault.list({chainId:inputs.neighborhood.subject.chainId,address:inputs.neighborhood.subject.address});
+   const previous=savedSnapshots.value;savedSnapshots.replaceChildren();
+   const placeholder=document.createElement("option");placeholder.value="";placeholder.textContent=records.length?"Select an archived snapshot…":"No snapshots archived for this subject";savedSnapshots.appendChild(placeholder);
+   for(const record of records){const option=document.createElement("option");option.value=record.id;option.textContent=record.generatedAt+" · saved "+record.savedAt+" · SHA-256 "+record.digest.slice(0,12);savedSnapshots.appendChild(option);}
+   if(records.some(record=>record.id===previous))savedSnapshots.value=previous;
+   vaultResult.textContent=records.length+" sealed snapshot(s) stored locally for this chain/address.";
+  }catch(error){vaultResult.textContent="LOCAL ARCHIVE UNAVAILABLE · "+error.message;}
+ };
+ saveSnapshot.addEventListener("click",async()=>{
+  saveSnapshot.disabled=true;vaultResult.textContent="Validating and sealing current dossier…";
+  try{
+   let latestPlaybook=inputs.playbook;try{const saved=JSON.parse(localStorage.getItem(investigationPlaybookStorageKey(inputs.neighborhood.subject))||"null");if(saved?.schema==="sentinel.investigation-playbook.v1")latestPlaybook=saved;}catch{}
+   let latestLedger=ledger;try{const saved=JSON.parse(localStorage.getItem(storageKey)||"null");if(saved?.schema==="sentinel.hypothesis-ledger.v1")latestLedger=saved;}catch{}
+   const fresh=buildInvestigationIntelligence({...inputs,playbook:latestPlaybook,hypothesisLedger:latestLedger,generatedAt:new Date().toISOString()});
+   const validation=validateInvestigationDossier(fresh);if(!validation.valid)throw new Error("Dossier structure invalid: "+validation.errors.join(" · "));
+   const sealed=await sealEvidenceArtifact(fresh),result=await (await getVault()).save(sealed);
+   vaultResult.textContent=result.saved?"SNAPSHOT ARCHIVED LOCALLY · SHA-256 "+result.record.digest:"SNAPSHOT ALREADY ARCHIVED · No duplicate record created.";
+   await refreshArchive();
+  }catch(error){vaultResult.textContent="ARCHIVE FAILED · "+error.message;}
+  finally{saveSnapshot.disabled=false;}
+ });
+ refreshVault.addEventListener("click",refreshArchive);
+ compareArchived.addEventListener("click",async()=>{
+  compareArchived.disabled=true;vaultResult.textContent="Loading and verifying archived snapshot…";
+  try{
+   const id=savedSnapshots.value;if(!id)throw new Error("Select an archived snapshot first.");
+   const vault=await getVault(),record=await vault.get(id);if(!record)throw new Error("Archived snapshot not found.");
+   if(!await verifyEvidenceArtifactSeal(record.envelope))throw new Error("Archived snapshot integrity check failed.");
+   const validation=validateInvestigationDossier(record.envelope.artifact);if(!validation.valid)throw new Error("Archived dossier structure invalid: "+validation.errors.join(" · "));
+   let latestPlaybook=inputs.playbook;try{const saved=JSON.parse(localStorage.getItem(investigationPlaybookStorageKey(inputs.neighborhood.subject))||"null");if(saved?.schema==="sentinel.investigation-playbook.v1")latestPlaybook=saved;}catch{}
+   let latestLedger=ledger;try{const saved=JSON.parse(localStorage.getItem(storageKey)||"null");if(saved?.schema==="sentinel.hypothesis-ledger.v1")latestLedger=saved;}catch{}
+   const current=buildInvestigationIntelligence({...inputs,playbook:latestPlaybook,hypothesisLedger:latestLedger,generatedAt:new Date().toISOString()});
+   const diff=compareInvestigationSnapshots(record.envelope.artifact,current);
+   vaultResult.textContent="ARCHIVED SNAPSHOT VERIFIED · "+diff.summary.addedEvidence+" added · "+diff.summary.retainedEvidence+" retained · "+diff.summary.notInCurrentSnapshot+" not included now · "+diff.summary.analystReviewChanges+" review changes · "+diff.summary.taskChanges+" task changes.";
+   const details=document.createElement("details"),summaryNode=document.createElement("summary");summaryNode.textContent="INSPECT CASE EVOLUTION DETAILS";const pre=document.createElement("pre");pre.style.cssText="white-space:pre-wrap;overflow-wrap:anywhere;font-size:9px;color:#b7d2e2";pre.textContent=JSON.stringify(diff,null,2);details.append(summaryNode,pre);vaultPanel.appendChild(details);
+   const exportDiff=document.createElement("button");exportDiff.type="button";exportDiff.textContent="EXPORT SEALED ARCHIVE DIFF ↓";exportDiff.addEventListener("click",()=>exportSealedJson(diff,"sentinel-case-vault-diff-"+diff.subject.chainId+"-"+diff.subject.address+"-sealed.json").catch(error=>{vaultResult.textContent=error.message;}));vaultPanel.appendChild(exportDiff);
+  }catch(error){vaultResult.textContent="COMPARISON FAILED · "+error.message;}
+  finally{compareArchived.disabled=false;}
+ });
+ vaultPanel.append(vaultTitle,vaultDescription,vaultToolbar,savedSnapshots,compareArchived,vaultResult);
+ container.append(metrics,assessment,hypotheses,timeline,caveat,warning,exportButton,exportLedger,reportButton,evolution,vaultPanel);
+
 }
 
 export function mountEntityRelationshipExplorer(container,graph,threatIntelligence){
