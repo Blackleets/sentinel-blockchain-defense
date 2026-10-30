@@ -2,9 +2,9 @@ name: SENTINEL CI
 
 on:
   push:
-    branches: [main, feat/evidence-confidence-engine]
+    branches: [main, feat/evidence-confidence-engine, feat/arkham-live-visualizer]
   pull_request:
-    branches: [main]
+    branches: [main, feat/evidence-confidence-engine]
 
 permissions:
   contents: read
