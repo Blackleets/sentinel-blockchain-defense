@@ -22,7 +22,7 @@ test("correlates shared proxy admin and EIP-7702 delegation target independently
     report(a, [{ kind: "erc1967-slots", admin }, { kind: "eip7702", delegated: true, implementationAddress: impl }]),
     report(b, [{ kind: "erc1967-slots", admin }, { kind: "eip7702", delegated: true, implementationAddress: impl }])
   ]);
-  assert.deepEqual(graph.edges.map(edge => edge.type).sort(), ["shared-erc1967-admin-slot", "shared-eip7702-delegation-target"]);
+  assert.deepEqual(graph.edges.map(edge => edge.type).sort(), ["shared-eip7702-delegation-target", "shared-erc1967-admin-slot"]);
 });
 
 test("records transaction participants without inferring a relationship verdict", () => {
