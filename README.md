@@ -22,6 +22,8 @@ SENTINEL is an evidence-led, read-only multichain EVM security research workspac
 - Rule-based evidence findings and chronological ERC-1967 change timeline for each inspection. Findings expose supporting observations and never produce an automatic maliciousness verdict or numeric risk score.
 - Evidence correlation engine for comparing multiple user-supplied case reports: shared EIP-7702 delegation targets, ERC-1967 implementations/admins/beacons, resolved implementations and observed transaction participants. Relationships remain evidence-only, never a maliciousness verdict.
 - Explainable threat-intelligence rules for repeated transaction senders and recipients, reused ERC-1967 slot infrastructure, and bounded upgrade-event clusters. Thresholds are configurable; every signal includes evidence and non-attribution caveats.
+- Observed transaction handoff trails connect a transaction recipient to a later sender on the same chain using imported transaction hashes and block ordering. These links are not proof of token transfers or fund movement.
+- Portable investigation dossier export (`sentinel.investigation-dossier.v1`) bundles accepted source case reports, the correlation graph, threat-intelligence output, source filenames, generation time and explicit analytical limitations. Export is generated locally in the browser.
 - Unit tests for case-report schema validation, proxy-event decoding, chronological ordering and evidence correlation.
 - Unit tests for EIP-7702 parsing, bytecode decoding, capability evidence and exact ETH formatting.
 - GitHub Actions CI runs the Node.js test suite on pushes and pull requests.
