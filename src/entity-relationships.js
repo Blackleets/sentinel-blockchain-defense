@@ -3,13 +3,13 @@ const normalize=value=>typeof value==="string"&&ADDRESS.test(value)?value.toLowe
 const unique=values=>[...new Set(values.filter(Boolean))].sort();
 
 /** Expand a bounded, chain-scoped neighborhood using only supplied evidence. */
-export function buildEntityNeighborhood({graph,threatIntelligence,chainId,address,maxDepth=2,maxNodes=100}){
+export function buildEntityNeighborhood({graph,threatIntelligence,chainId,address,maxDepth=2,maxNodes=100,maxEdges=250}){
  if(!graph||graph.schema!=="sentinel.correlation-graph.v1")throw new TypeError("A SENTINEL correlation graph is required");
  if(!threatIntelligence||threatIntelligence.schema!=="sentinel.threat-intelligence.v1")throw new TypeError("SENTINEL threat intelligence is required");
  const origin=normalize(address);if(!origin)throw new TypeError("A valid EVM address is required");
  const chain=typeof chainId==="string"&&chainId?chainId.toLowerCase():"unknown";
  if(!Number.isInteger(maxDepth)||maxDepth<1||maxDepth>3)throw new RangeError("maxDepth must be an integer between 1 and 3");
- if(!Number.isInteger(maxNodes)||maxNodes<1||maxNodes>500)throw new RangeError("maxNodes must be an integer between 1 and 500");
+ if(!Number.isInteger(maxNodes)||maxNodes<1||maxNodes>500)throw new RangeError("maxNodes must be an integer between 1 and 500");\n if(!Number.isInteger(maxEdges)||maxEdges<1||maxEdges>2000)throw new RangeError("maxEdges must be an integer between 1 and 2000");
  const edges=new Map();
  const add=(from,to,type,source,evidence={})=>{const left=normalize(from),right=normalize(to);if(!left||!right||left===right)return;const key=[chain,type,left,right,source].join("|");if(!edges.has(key))edges.set(key,{id:key,chainId:chain,type,from:left,to:right,source,evidence:[]});const item=edges.get(key),serialized=JSON.stringify(evidence);if(!item.evidence.some(value=>JSON.stringify(value)===serialized))item.evidence.push(evidence);};
  for(const edge of graph.edges||[]){if(edge.chainId!==chain)continue;if(edge.type==="observed-transaction-flow"){add(edge.from,edge.to,edge.type,"correlation-graph",edge);continue;}const sharedEvidence=(edge.evidence||[]).filter(item=>normalize(item?.sharedAddress));if(sharedEvidence.length){for(const item of sharedEvidence){const shared=normalize(item.sharedAddress);const provenance={...edge,sharedAddress:shared,sharedRole:item.role||null,observationKind:item.observationKind||null,caseSubjects:item.caseSubjects||[]};add(edge.from,shared,edge.type,"shared-infrastructure",provenance);add(edge.to,shared,edge.type,"shared-infrastructure",provenance);}}else add(edge.from,edge.to,edge.type,"correlation-graph",edge);}
