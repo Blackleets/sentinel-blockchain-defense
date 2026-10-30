@@ -178,10 +178,13 @@ function renderInvestigationIntelligence(container,inputs){
  const vaultToolbar=document.createElement("div");vaultToolbar.className="sentinel-playbook-toolbar";
  const saveSnapshot=document.createElement("button");saveSnapshot.type="button";saveSnapshot.textContent="ARCHIVE CURRENT SNAPSHOT ↓";
  const refreshVault=document.createElement("button");refreshVault.type="button";refreshVault.textContent="REFRESH ARCHIVE";
+ const exportVault=document.createElement("button");exportVault.type="button";exportVault.textContent="EXPORT VAULT BACKUP ↓";
+ const importVaultFile=document.createElement("input");importVaultFile.type="file";importVaultFile.accept="application/json,.json";importVaultFile.setAttribute("aria-label","Select sealed SENTINEL case vault backup");
+ const importVault=document.createElement("button");importVault.type="button";importVault.textContent="RESTORE VAULT BACKUP ↑";
  const savedSnapshots=document.createElement("select");savedSnapshots.setAttribute("aria-label","Saved case snapshots");savedSnapshots.style.minWidth="0";savedSnapshots.style.width="100%";
  const compareArchived=document.createElement("button");compareArchived.type="button";compareArchived.textContent="COMPARE ARCHIVED SNAPSHOT ↗";
  const vaultResult=document.createElement("p");vaultResult.className="sentinel-playbook-warning";vaultResult.setAttribute("aria-live","polite");vaultResult.textContent="Local archive not loaded yet.";
- vaultToolbar.append(saveSnapshot,refreshVault);
+ vaultToolbar.append(saveSnapshot,refreshVault,exportVault,importVaultFile,importVault);
  let vaultPromise;
  const getVault=()=>vaultPromise||(vaultPromise=Promise.resolve().then(()=>createCaseVault({store:createIndexedDbCaseVaultStore(),verifySeal:verifyEvidenceArtifactSeal,validateDossier:validateInvestigationDossier})));
  const refreshArchive=async()=>{
@@ -208,6 +211,25 @@ function renderInvestigationIntelligence(container,inputs){
   finally{saveSnapshot.disabled=false;}
  });
  refreshVault.addEventListener("click",refreshArchive);
+ exportVault.addEventListener("click",async()=>{
+  exportVault.disabled=true;vaultResult.textContent="Preparing sealed local archive backup…";
+  try{
+   const backup=await (await getVault()).exportBackup(),sealed=await sealEvidenceArtifact(backup);
+   exportJson(sealed,"sentinel-case-vault-backup-"+new Date().toISOString().replace(/[:.]/g,"-")+".json");
+   vaultResult.textContent="VAULT BACKUP EXPORTED · "+backup.recordCount+" sealed dossier record(s). Keep this file outside the browser.";
+  }catch(error){vaultResult.textContent="BACKUP FAILED · "+error.message;}
+  finally{exportVault.disabled=false;}
+ });
+ importVault.addEventListener("click",async()=>{
+  const file=importVaultFile.files?.[0];if(!file){vaultResult.textContent="Select a sealed case vault backup first.";return;}
+  importVault.disabled=true;vaultResult.textContent="Verifying backup envelope and every archived dossier…";
+  try{
+   const sealed=JSON.parse(await file.text()),result=await (await getVault()).importBackup(sealed);
+   vaultResult.textContent="VAULT RESTORED · "+result.added+" added · "+result.duplicates+" already present. Every imported dossier passed integrity and structure checks.";
+   await refreshArchive();
+  }catch(error){vaultResult.textContent="RESTORE REJECTED · "+error.message;}
+  finally{importVault.disabled=false;}
+ });
  compareArchived.addEventListener("click",async()=>{
   compareArchived.disabled=true;vaultResult.textContent="Loading and verifying archived snapshot…";
   try{
