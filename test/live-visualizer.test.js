@@ -50,6 +50,8 @@ test("expands relationship graph to two bounded hops",()=>{
  const two=buildLiveTransferGraph(transfers,{address:a,chainId:"0x1",hops:2});
  assert.equal(one.nodeCount,2);assert.equal(one.edgeCount,1);
  assert.equal(two.nodeCount,3);assert.equal(two.edgeCount,2);assert.equal(two.hops,2);
+ const capped=buildLiveTransferGraph(transfers,{address:a,chainId:"0x1",hops:2,maxNodes:2});
+ assert.equal(capped.nodeCount,2);assert.equal(capped.truncated,true);
 });
 test("rejects invalid addresses and edge bounds",()=>{
  assert.throws(()=>buildLiveTransferGraph([],{address:"bad",chainId:"0x1"}),/valid EVM address/);
