@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { correlateCases } from "../src/correlation.js";
 
 const a = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-const b = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const b = "0x1111111111111111111111111111111111111111";
 const impl = "0x1111111111111111111111111111111111111111";
 const admin = "0x2222222222222222222222222222222222222222";
 const report = (subject, observations = []) => ({ schema: "sentinel.case-report.v1", subject, observations });
