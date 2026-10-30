@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ERC20_TRANSFER_TOPIC, decodeTransferLogs, buildLiveTransferGraph, formatTokenAmount, decodeAbiString, decodeTokenMetadata } from "../src/live-visualizer.js";
+import { ERC20_TRANSFER_TOPIC, decodeTransferLogs, buildLiveTransferGraph, formatTokenAmount, decodeAbiString, decodeTokenMetadata, bindNetworkRpc } from "../src/live-visualizer.js";
 
 const a="0x1111111111111111111111111111111111111111";
 const b="0x2222222222222222222222222222222222222222";
@@ -57,4 +57,17 @@ test("rejects invalid addresses and edge bounds",()=>{
  assert.throws(()=>buildLiveTransferGraph([],{address:"bad",chainId:"0x1"}),/valid EVM address/);
  assert.throws(()=>buildLiveTransferGraph([],{address:a,chainId:"0x1",maxEdges:501}),/maxEdges/);
  assert.throws(()=>buildLiveTransferGraph([],{address:a,chainId:"invalid"}),/chain ID/);
+});
+
+
+test("pins every visualizer RPC request to the network selected when tracing began",async()=>{
+ const calls=[],ethereum={chainId:"0x1",rpc:"https://rpc.example/eth",explorer:"https://etherscan.io"},polygon={chainId:"0x89",rpc:"https://rpc.example/poly",explorer:"https://polygonscan.com"};
+ const activeNetwork=ethereum;
+ const pinned=bindNetworkRpc((method,params,network)=>{calls.push({method,params,chainId:network.chainId,url:network.rpc});return network.chainId;},activeNetwork);
+ assert.equal(pinned("eth_chainId"),"0x1");
+ assert.equal(pinned("eth_blockNumber"),"0x1");
+ assert.equal(pinned("eth_getLogs",[]),"0x1");
+ assert.equal(calls.length,3);
+ assert.ok(calls.every(call=>call.chainId==="0x1"&&call.url===ethereum.rpc));
+ assert.notEqual(polygon.chainId,activeNetwork.chainId);
 });
