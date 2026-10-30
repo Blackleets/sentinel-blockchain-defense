@@ -4,6 +4,7 @@ export function buildCaseReport({
   subject,
   subjectType,
   chainId,
+  networkName,
   provider,
   observedAt,
   blockNumber,
@@ -18,8 +19,9 @@ export function buildCaseReport({
     reportType: "read-only-evidence-snapshot",
     subject: subject.trim().toLowerCase(),
     subjectType,
+    chainId: chainId ?? "0x1",
     network: {
-      name: "Ethereum Mainnet",
+      name: networkName || (chainId === "0x38" ? "BNB Smart Chain" : chainId === "0x89" ? "Polygon PoS" : "Ethereum Mainnet"),
       chainId: chainId ?? "0x1",
       provider: provider || null
     },
