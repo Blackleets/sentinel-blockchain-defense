@@ -12,6 +12,7 @@ import {compareInvestigationSnapshots} from "./investigation-snapshot-diff.js";
 import {buildInvestigationMarkdownReport} from "./investigation-report.js";
 import {createCaseVault,createIndexedDbCaseVaultStore} from "./case-vault.js";
 import {validateInvestigationDossier} from "./investigation-dossier-validation.js";
+import {verifyInvestigationDossierSources} from "./investigation-source-verification.js";
 const SVG="http://www.w3.org/2000/svg";
 const TYPE_LABELS={"observed-transaction-flow":"Transaction flow","observed-token-transfer-log":"Token transfer log","transaction-handoff":"Transaction handoff","shared-erc1967-implementation":"Shared ERC-1967 implementation","shared-erc1967-admin-slot":"Shared ERC-1967 admin slot","shared-erc1967-beacon":"Shared ERC-1967 beacon","shared-eip7702-delegation-target":"Shared EIP-7702 target"};
 const TYPE_COLORS={"correlation-graph":"#64d7e8","receipt-log":"#a78bfa","transaction-handoff":"#f6b95d","shared-infrastructure":"#e879b8"};
@@ -141,6 +142,30 @@ function renderInvestigationIntelligence(container,inputs){
    exportText(markdown,"sentinel-investigation-report-"+latest.subject.chainId+"-"+latest.subject.address+".md");
   }catch(error){const note=document.createElement("p");note.className="sentinel-playbook-warning";note.dataset.error="true";note.textContent=error.message;container.appendChild(note);}
  });
+ const sourceVerificationPanel=document.createElement("section");sourceVerificationPanel.className="sentinel-rel-compare";
+ const sourceVerificationTitle=document.createElement("h4");sourceVerificationTitle.textContent="ON-CHAIN SOURCE VERIFICATION / READ-ONLY RPC";
+ const sourceVerificationDescription=document.createElement("p");sourceVerificationDescription.textContent="Re-check transaction hashes and receipt-backed transfer observations against the configured RPC endpoint for this chain. One provider only; no consensus or attribution claim."; 
+ const sourceVerificationButton=document.createElement("button");sourceVerificationButton.type="button";sourceVerificationButton.textContent="VERIFY TRANSACTION SOURCES ↗";
+ const sourceVerificationResult=document.createElement("div");sourceVerificationResult.className="sentinel-playbook-history";sourceVerificationResult.setAttribute("aria-live","polite");sourceVerificationResult.textContent="No RPC source verification has been run for this snapshot."; 
+ sourceVerificationButton.addEventListener("click",async()=>{
+  sourceVerificationButton.disabled=true;sourceVerificationResult.textContent="Checking chain identity, transactions and receipts…";
+  try{
+   let latestPlaybook=inputs.playbook;try{const saved=JSON.parse(localStorage.getItem(investigationPlaybookStorageKey(inputs.neighborhood.subject))||"null");if(saved?.schema==="sentinel.investigation-playbook.v1")latestPlaybook=saved;}catch{}
+   let latestLedger=ledger;try{const saved=JSON.parse(localStorage.getItem(storageKey)||"null");if(saved?.schema==="sentinel.hypothesis-ledger.v1")latestLedger=saved;}catch{}
+   const fresh=buildInvestigationIntelligence({...inputs,playbook:latestPlaybook,hypothesisLedger:latestLedger,generatedAt:new Date().toISOString()});
+   const validation=validateInvestigationDossier(fresh);if(!validation.valid)throw new Error("Dossier structure invalid: "+validation.errors.join(" · "));
+   const verification=await verifyInvestigationDossierSources(fresh,{maxTransactions:50});
+   sourceVerificationResult.replaceChildren();
+   const summaryNode=document.createElement("p");summaryNode.textContent="RPC · "+verification.providerName+" · "+verification.provider+" · chain "+verification.chainCheck.actual+" · "+verification.summary.confirmedTransactions+" confirmed · "+verification.summary.pendingTransactions+" pending · "+verification.summary.notFoundTransactions+" not found · "+verification.summary.receiptUnavailableTransactions+" receipts unavailable · "+verification.summary.inconsistentTransactions+" inconsistent · "+verification.summary.evidenceMismatches+" evidence mismatch(es).";
+   const coverage=document.createElement("p");coverage.textContent="REFERENCES · "+verification.coverage.checkedTransactions+" checked / "+verification.coverage.uniqueTransactionReferences+" found in dossier · "+verification.coverage.notChecked+" not checked due to limit."; 
+   const caveat=document.createElement("p");caveat.textContent="This is a point-in-time response from one RPC provider. It does not prove authorship, identity, intent, finality or token legitimacy."; 
+   const detail=document.createElement("pre");detail.style.cssText="white-space:pre-wrap;overflow-wrap:anywhere;font-size:9px;color:#b7d2e2";detail.textContent=JSON.stringify({results:verification.results,limitations:verification.limitations},null,2);
+   const exportVerification=document.createElement("button");exportVerification.type="button";exportVerification.textContent="EXPORT SEALED RPC VERIFICATION ↓";exportVerification.addEventListener("click",()=>exportSealedJson(verification,"sentinel-source-verification-"+verification.subject.chainId+"-"+verification.subject.address+"-sealed.json").catch(error=>{sourceVerificationResult.textContent=error.message;}));
+   sourceVerificationResult.append(summaryNode,coverage,caveat,detail,exportVerification);
+  }catch(error){sourceVerificationResult.textContent="SOURCE VERIFICATION FAILED · "+error.message;}
+  finally{sourceVerificationButton.disabled=false;}
+ });
+ sourceVerificationPanel.append(sourceVerificationTitle,sourceVerificationDescription,sourceVerificationButton,sourceVerificationResult);
  const evolution=document.createElement("section");evolution.className="sentinel-rel-compare";
  const evolutionTitle=document.createElement("h4");evolutionTitle.textContent="CASE EVOLUTION / SNAPSHOT COMPARISON";
  const evolutionText=document.createElement("p");evolutionText.textContent="Load a previous sealed dossier to compare imported evidence, hypothesis changes and analyst workflow against this current snapshot.";
@@ -248,7 +273,7 @@ function renderInvestigationIntelligence(container,inputs){
   finally{compareArchived.disabled=false;}
  });
  vaultPanel.append(vaultTitle,vaultDescription,vaultToolbar,savedSnapshots,compareArchived,vaultResult);
- container.append(metrics,assessment,hypotheses,timeline,caveat,warning,exportButton,exportLedger,importLedgerFile,importLedgerButton,reportButton,evolution,vaultPanel);
+ container.append(metrics,assessment,hypotheses,timeline,caveat,warning,exportButton,exportLedger,importLedgerFile,importLedgerButton,reportButton,sourceVerificationPanel,evolution,vaultPanel);
 
 }
 
