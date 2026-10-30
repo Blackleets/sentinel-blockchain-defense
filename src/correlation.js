@@ -21,7 +21,7 @@ function addNode(nodes, chainId, address, role, caseSubject) {
 
 function observationFacts(report) {
   const facts = [];
-  const chainId = normalizeChainId(report.chainId);
+  const chainId = normalizeChainId(report.chainId ?? report.network?.chainId);
   const subject = normalizeAddress(report.subject);
   if (subject) facts.push({ address: subject, role: "subject", kind: "case-subject", chainId });
   for (const observation of Array.isArray(report.observations) ? report.observations : []) {
