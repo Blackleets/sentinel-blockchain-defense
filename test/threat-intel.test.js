@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { analyzeThreatIntelligence } from "../src/threat-intel.js";
+import { analyzeThreatIntelligence, decodeErc20TransferLog } from "../src/threat-intel.js";
 
 const a = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const b = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
@@ -142,4 +142,41 @@ test("address profiles omit transactions without valid mined evidence", () => {
     report("0x1111111111111111111111111111111111111111", [tx(null, a, b, "0x100"), tx("0xabc", a, b, null)])
   ]);
   assert.equal(result.addressProfiles.length, 0);
+});
+
+const transferTopic = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+const indexed = address => "0x" + address.slice(2).padStart(64, "0");
+const transferLog = (overrides = {}) => ({
+  address: shared,
+  topics: [transferTopic, indexed(a), indexed(b)],
+  data: "0x" + (2500n).toString(16).padStart(64, "0"),
+  blockNumber: "0x100",
+  transactionHash: "0xabc",
+  logIndex: "0x2",
+  ...overrides
+});
+
+test("decodes a standard ERC-20 Transfer log without guessing token decimals", () => {
+  const decoded = decodeErc20TransferLog(transferLog());
+  assert.deepEqual(decoded, { token: shared, from: a, to: b, amountRaw: "2500" });
+});
+
+test("rejects malformed and non-Transfer event logs", () => {
+  assert.equal(decodeErc20TransferLog(null), null);
+  assert.equal(decodeErc20TransferLog(transferLog({ topics: [transferTopic] })), null);
+  assert.equal(decodeErc20TransferLog(transferLog({ topics: ["0x" + "0".repeat(64), indexed(a), indexed(b)] })), null);
+  assert.equal(decodeErc20TransferLog(transferLog({ topics: [transferTopic, "0x" + "f".repeat(64), indexed(b)] })), null);
+  assert.equal(decodeErc20TransferLog(transferLog({ data: "0x1234" })), null);
+});
+
+test("extracts and deduplicates receipt Transfer logs in imported evidence", () => {
+  const receipt = { kind: "receipt", value: { transactionHash: "0xabc", blockNumber: "0x100", logs: [transferLog(), transferLog()] } };
+  const result = analyzeThreatIntelligence([
+    { ...report(a, [receipt]), subjectType: "transaction" }
+  ]);
+  assert.equal(result.tokenTransfers.length, 1);
+  assert.equal(result.tokenTransfers[0].amountRaw, "2500");
+  assert.equal(result.tokenTransfers[0].token, shared);
+  assert.equal(result.tokenTransfers[0].from, a);
+  assert.equal(result.tokenTransfers[0].to, b);
 });
