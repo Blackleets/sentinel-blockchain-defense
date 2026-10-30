@@ -69,7 +69,8 @@ export function analyzeThreatIntelligence(reports, overrides = {}) {
   const grouped = new Map();
   const upgradesByChain = new Map();
   const senderActivity = new Map();
-  const transactionObservations = [];\n  const tokenTransferCandidates = [];
+  const transactionObservations = [];
+  const tokenTransferCandidates = [];
 
   for (const report of validReports) {
     const chainId = chainIdOf(report);
