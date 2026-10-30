@@ -18,6 +18,7 @@ SENTINEL is an evidence-led, read-only Ethereum security research workspace. The
 - Heuristic UUPS / ERC-1822 selector indicators (`proxiableUUID`, `upgradeTo`, `upgradeToAndCall`) clearly labelled as selector candidates, never proof of a working upgrade path.
 - Export a provenance-labelled JSON evidence snapshot for address and transaction inspections, including provider, chain ID, block context and explicit non-verdict caveats.
 - Import multiple exported case reports locally and build a cross-case evidence graph for shared proxy/delegation infrastructure and observed transaction flows; export the graph as JSON.
+- Rule-based evidence findings and chronological ERC-1967 change timeline for each inspection. Findings expose supporting observations and never produce an automatic maliciousness verdict or numeric risk score.
 - Evidence correlation engine for comparing multiple user-supplied case reports: shared EIP-7702 delegation targets, ERC-1967 implementations/admins/beacons, resolved implementations and observed transaction participants. Relationships remain evidence-only, never a maliciousness verdict.\n- Unit tests for case-report schema validation, proxy-event decoding, chronological ordering and evidence correlation.
 - Unit tests for EIP-7702 parsing, bytecode decoding, capability evidence and exact ETH formatting.
 - GitHub Actions CI runs the Node.js test suite on pushes and pull requests.
