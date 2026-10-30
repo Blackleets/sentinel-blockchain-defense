@@ -75,3 +75,9 @@ Future expansion should keep these domains separated:
 5. Keep simulations isolated and clearly labelled; never broadcast them.
 6. Do not add wallet signing or private-key handling.
 7. Add automated tests before introducing scoring or automated alerts.
+
+## Evidence Confidence Engine (release 10)
+
+The pure module `src/evidence-confidence.js` consumes only a result produced by `verifyInvestigationDossierSources`. It evaluates five explicit dimensions: configured RPC chain identity, transaction/receipt consistency, receipt block-hash comparison, correlation of dossier observations against fetched source data, and coverage of all transaction references. Each dimension is `verified`, `conflicting` or `unknown`; the case-level assessment is `corroborated`, `partially-corroborated`, `inconclusive` or `conflicting`. Per-transaction assessments retain transaction-hash references and their own checks.
+
+The engine intentionally has no numeric confidence or risk score. Missing, pending, truncated, unavailable or uncheckable evidence remains unknown and is never counted as a pass. A mismatch is surfaced for analyst review but is not a maliciousness verdict. A matched block hash is still only a point-in-time response from one configured RPC endpoint, not consensus or finality proof. The module is deterministic and has no network, storage or wallet side effects; tests live in `test/evidence-confidence.test.js`.
