@@ -2,10 +2,7 @@ const ADDRESS=/^0x[0-9a-f]{40}$/i;
 const normalize=value=>typeof value==="string"&&ADDRESS.test(value)?value.toLowerCase():null;
 const unique=values=>[...new Set(values.filter(Boolean))].sort();
 
-/**
- * Expand a bounded, chain-scoped neighborhood using only supplied evidence.
- * Each edge retains its source and provenance; relationships are not attribution.
- */
+/** Expand a bounded, chain-scoped neighborhood using only supplied evidence. */
 export function buildEntityNeighborhood({graph,threatIntelligence,chainId,address,maxDepth=2,maxNodes=100}){
  if(!graph||graph.schema!=="sentinel.correlation-graph.v1")throw new TypeError("A SENTINEL correlation graph is required");
  if(!threatIntelligence||threatIntelligence.schema!=="sentinel.threat-intelligence.v1")throw new TypeError("SENTINEL threat intelligence is required");
@@ -14,50 +11,15 @@ export function buildEntityNeighborhood({graph,threatIntelligence,chainId,addres
  if(!Number.isInteger(maxDepth)||maxDepth<1||maxDepth>3)throw new RangeError("maxDepth must be an integer between 1 and 3");
  if(!Number.isInteger(maxNodes)||maxNodes<1||maxNodes>500)throw new RangeError("maxNodes must be an integer between 1 and 500");
  const edges=new Map();
- const add=(from,to,type,source,evidence={})=>{
-  const left=normalize(from),right=normalize(to);if(!left||!right||left===right)return;
-  const key=[chain,type,left,right,source].join("|");
-  if(!edges.has(key))edges.set(key,{id:key,chainId:chain,type,from:left,to:right,source,evidence:[]});
-  const item=edges.get(key);const serialized=JSON.stringify(evidence);
-  if(!item.evidence.some(value=>JSON.stringify(value)===serialized))item.evidence.push(evidence);
- };
- for(const edge of graph.edges||[]){
-  if(edge.chainId!==chain)continue;
-  if(edge.type==="observed-transaction-flow")add(edge.from,edge.to,edge.type,"correlation-graph",edge);
-  else {
-   const shared=normalize(edge.evidence?.[0]?.sharedAddress);
-   if(shared){add(edge.from,shared,edge.type,"shared-infrastructure",edge);add(edge.to,shared,edge.type,"shared-infrastructure",edge);}
-   else add(edge.from,edge.to,edge.type,"correlation-graph",edge);
-  }
- }
- for(const transfer of threatIntelligence.tokenTransfers||[]){
-  if(transfer.chainId===chain)add(transfer.from,transfer.to,"observed-token-transfer-log","receipt-log",{
-   token:transfer.token,transactionHash:transfer.transactionHash,blockNumber:transfer.blockNumber,
-   logIndex:transfer.logIndex,amountRaw:transfer.amountRaw,caseSubject:transfer.caseSubject
-  });
- }
- for(const link of threatIntelligence.transactionLinks||[]){
-  if(link.chainId===chain)add(link.from,link.via,"transaction-handoff","transaction-handoff",link);
-  if(link.chainId===chain)add(link.via,link.to,"transaction-handoff","transaction-handoff",link);
- }
- const adjacency=new Map();
- for(const edge of edges.values()){for(const [from,to] of [[edge.from,edge.to],[edge.to,edge.from]]){if(!adjacency.has(from))adjacency.set(from,[]);adjacency.get(from).push({edge,to});}}
+ const add=(from,to,type,source,evidence={})=>{const left=normalize(from),right=normalize(to);if(!left||!right||left===right)return;const key=[chain,type,left,right,source].join("|");if(!edges.has(key))edges.set(key,{id:key,chainId:chain,type,from:left,to:right,source,evidence:[]});const item=edges.get(key),serialized=JSON.stringify(evidence);if(!item.evidence.some(value=>JSON.stringify(value)===serialized))item.evidence.push(evidence);};
+ for(const edge of graph.edges||[]){if(edge.chainId!==chain)continue;if(edge.type==="observed-transaction-flow")add(edge.from,edge.to,edge.type,"correlation-graph",edge);else{const shared=normalize(edge.evidence?.[0]?.sharedAddress);if(shared){add(edge.from,shared,edge.type,"shared-infrastructure",edge);add(edge.to,shared,edge.type,"shared-infrastructure",edge);}else add(edge.from,edge.to,edge.type,"correlation-graph",edge);}}
+ for(const transfer of threatIntelligence.tokenTransfers||[])if(transfer.chainId===chain)add(transfer.from,transfer.to,"observed-token-transfer-log","receipt-log",{token:transfer.token,transactionHash:transfer.transactionHash,blockNumber:transfer.blockNumber,logIndex:transfer.logIndex,amountRaw:transfer.amountRaw,caseSubject:transfer.caseSubject});
+ for(const link of threatIntelligence.transactionLinks||[])if(link.chainId===chain){add(link.from,link.via,"transaction-handoff","transaction-handoff",link);add(link.via,link.to,"transaction-handoff","transaction-handoff",link);}
+ const adjacency=new Map();for(const edge of edges.values())for(const [from,to] of [[edge.from,edge.to],[edge.to,edge.from]]){if(!adjacency.has(from))adjacency.set(from,[]);adjacency.get(from).push({edge,to});}
  for(const list of adjacency.values())list.sort((a,b)=>a.to.localeCompare(b.to)||a.edge.type.localeCompare(b.edge.type));
- const distance=new Map([[origin,0]]),queue=[origin],selected=new Set();
- while(queue.length){
-  const current=queue.shift(),depth=distance.get(current);if(depth>=maxDepth)continue;
-  for(const item of adjacency.get(current)||[]){
-   if(!distance.has(item.to)){if(distance.size>=maxNodes+1)continue;distance.set(item.to,depth+1);queue.push(item.to);}
-   if(distance.get(item.to)<=maxDepth)selected.add(item.edge.id);
-  }
- }
- const includedEdges=[...edges.values()].filter(edge=>selected.has(edge.id)).sort((a,b)=>a.from.localeCompare(b.from)||a.to.localeCompare(b.to)||a.type.localeCompare(b.type)||a.source.localeCompare(b.source));
+ const distance=new Map([[origin,0]]),queue=[origin],selected=new Set();let truncated=false;
+ while(queue.length){const current=queue.shift(),depth=distance.get(current);if(depth>=maxDepth)continue;for(const item of adjacency.get(current)||[]){if(!distance.has(item.to)){if(distance.size>=maxNodes){truncated=true;continue;}distance.set(item.to,depth+1);queue.push(item.to);}if(distance.has(item.to)&&distance.get(item.to)<=maxDepth)selected.add(item.edge.id);}}
+ const includedEdges=[...edges.values()].filter(edge=>selected.has(edge.id)&&distance.has(edge.from)&&distance.has(edge.to)).sort((a,b)=>a.from.localeCompare(b.from)||a.to.localeCompare(b.to)||a.type.localeCompare(b.type)||a.source.localeCompare(b.source));
  const nodeAddresses=unique([origin,...includedEdges.flatMap(edge=>[edge.from,edge.to])]);
- return {schema:"sentinel.entity-neighborhood.v1",subject:{chainId:chain,address:origin},maxDepth,maxNodes,
-  nodes:nodeAddresses.map(nodeAddress=>({address:nodeAddress,distance:distance.get(nodeAddress)??null,origin:nodeAddress===origin})),
-  edges:includedEdges,summary:{nodeCount:nodeAddresses.length,edgeCount:includedEdges.length,sourceCounts:includedEdges.reduce((out,edge)=>(out[edge.source]=(out[edge.source]||0)+1,out),{}),truncated:distance.size>=maxNodes+1},
-  coverage:"supplied-correlation-graph-and-imported-receipt-logs-only",
-  limitations:["Neighborhood edges are observed relationships, not proof of ownership, control, coordination or malicious intent.","Shared infrastructure links are mediated through the exact shared address recorded in graph evidence.","Token-transfer edges reflect Transfer-shaped receipt logs and do not prove legitimate token semantics or movement of the same assets.","Missing edges reflect evidence coverage, not absence of real-world relationships."],
-  assessment:{verdict:"not-assessed",riskScore:null}
- };
+ return {schema:"sentinel.entity-neighborhood.v1",subject:{chainId:chain,address:origin},maxDepth,maxNodes,nodes:nodeAddresses.map(addressValue=>({address:addressValue,distance:distance.get(addressValue)??null,origin:addressValue===origin})),edges:includedEdges,summary:{nodeCount:nodeAddresses.length,edgeCount:includedEdges.length,sourceCounts:includedEdges.reduce((out,edge)=>(out[edge.source]=(out[edge.source]||0)+1,out),{}),truncated},coverage:"supplied-correlation-graph-and-imported-receipt-logs-only",limitations:["Neighborhood edges are observed relationships, not proof of ownership, control, coordination or malicious intent.","Shared infrastructure links are mediated through the exact shared address recorded in graph evidence.","Token-transfer edges reflect Transfer-shaped receipt logs and do not prove legitimate token semantics or movement of the same assets.","Missing edges reflect evidence coverage, not absence of real-world relationships."],assessment:{verdict:"not-assessed",riskScore:null}};
 }
