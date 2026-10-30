@@ -20,8 +20,10 @@ export function decodeTransferLogs(logs, { chainId } = {}) {
   if (!Array.isArray(logs)) throw new TypeError("RPC logs must be an array");
   const seen = new Set(), transfers = [];
   for (const log of logs) {
-    if (!log || !Array.isArray(log.topics) || log.topics.length < 3 ||
+    if (!log || log.removed === true || !Array.isArray(log.topics) || log.topics.length !== 3 ||
         String(log.topics[0]).toLowerCase() !== ERC20_TRANSFER_TOPIC ||
+        !/^0x0{24}[0-9a-f]{40}$/i.test(log.topics[1] || "") ||
+        !/^0x0{24}[0-9a-f]{40}$/i.test(log.topics[2] || "") ||
         !HASH.test(log.transactionHash || "") || !/^0x[0-9a-f]+$/i.test(log.blockNumber || "") ||
         !/^0x[0-9a-f]+$/i.test(log.logIndex || "") || !/^0x[0-9a-f]{64}$/i.test(log.data || "")) continue;
     const from = normalizeAddress("0x" + String(log.topics[1]).slice(-40));
@@ -48,6 +50,7 @@ export function buildLiveTransferGraph(transfers, { address, chainId, scannedFro
   const origin = normalizeAddress(address);
   if (!origin) throw new TypeError("A valid EVM address is required");
   if (!Array.isArray(transfers)) throw new TypeError("Transfers must be an array");
+  if (typeof chainId !== "string" || !/^0x[0-9a-f]+$/i.test(chainId)) throw new TypeError("A valid hexadecimal chain ID is required");
   if (!Number.isInteger(maxEdges) || maxEdges < 1 || maxEdges > 500) throw new RangeError("maxEdges must be between 1 and 500");
   const accepted = transfers.filter(item => item && item.chainId === String(chainId).toLowerCase() &&
     (item.from === origin || item.to === origin)).slice().sort((a,b) =>
