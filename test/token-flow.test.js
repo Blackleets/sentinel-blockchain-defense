@@ -108,4 +108,10 @@ test("enforces hop and path bounds and handles identical endpoints", () => {
   assert.throws(() => findObservedTokenPaths(graph, { from: a, to: c, maxHops: 6 }), /between 1 and 5/);
   assert.equal(findObservedTokenPaths(graph, { from: a, to: a }).pathCount, 0);
   assert.throws(() => findObservedTokenPaths(graph, { from: a, to: c, maxPaths: 0 }), /between 1 and 50/);
+  const capped = findObservedTokenPaths(graph, { from: a, to: c, maxPaths: 1 });
+  const complete = findObservedTokenPaths(graph, { from: a, to: c, maxPaths: 2 });
+  assert.equal(capped.pathCount, 1);
+  assert.equal(capped.truncated, true);
+  assert.equal(complete.pathCount, 2);
+  assert.equal(complete.truncated, false);
 });
