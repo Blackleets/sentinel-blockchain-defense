@@ -15,7 +15,9 @@ test("decodes indexed Transfer logs and preserves raw base-unit amount",()=>{
  assert.equal(result[0].amountRaw,"42");assert.equal(result[0].chainId,"0x1");
 });
 test("deduplicates logs and ignores malformed or unrelated events",()=>{
- const result=decodeTransferLogs([log(),log(),{...log("0x4444444444444444444444444444444444444444",b,"0x1"),topics:["0x"+"0".repeat(64)]}],{chainId:"0x1"});
+ const malformedTopic=log();malformedTopic.topics[1]="0x"+"f".repeat(64);
+ const removed={...log(a,b,"0x2"),removed:true};
+ const result=decodeTransferLogs([log(),log(),{...log("0x4444444444444444444444444444444444444444",b,"0x1"),topics:["0x"+"0".repeat(64)]},malformedTopic,removed],{chainId:"0x1"});
  assert.equal(result.length,1);
 });
 test("builds an address-centred graph with bounded edges and chain isolation",()=>{
@@ -43,4 +45,5 @@ test("decodes standard ABI strings, bytes32 symbols and bounded decimals",()=>{
 test("rejects invalid addresses and edge bounds",()=>{
  assert.throws(()=>buildLiveTransferGraph([],{address:"bad",chainId:"0x1"}),/valid EVM address/);
  assert.throws(()=>buildLiveTransferGraph([],{address:a,chainId:"0x1",maxEdges:501}),/maxEdges/);
+ assert.throws(()=>buildLiveTransferGraph([],{address:a,chainId:"invalid"}),/chain ID/);
 });
