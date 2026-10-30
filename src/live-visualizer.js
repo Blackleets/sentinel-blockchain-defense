@@ -1,5 +1,13 @@
 import { fetchBlockscoutAddressTransfers, fetchBlockscoutAddressActivity, BLOCKSCOUT_ENDPOINTS } from "./blockscout-provider.js";
 import { traceFundPaths } from "./fund-tracer.js";
+export function bindNetworkRpc(rpc, network) {
+  if (typeof rpc !== "function") throw new TypeError("A JSON-RPC function is required");
+  if (!network || typeof network.chainId !== "string" || typeof network.rpc !== "string" || typeof network.explorer !== "string") {
+    throw new TypeError("A complete selected network descriptor is required");
+  }
+  return (method, params = []) => rpc(method, params, network);
+}
+
 const ADDRESS = /^0x[0-9a-f]{40}$/i;
 const HASH = /^0x[0-9a-f]{64}$/i;
 export const ERC20_TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
@@ -229,7 +237,7 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
     const edge=current.edges[index],meta=tokenMetadata.get(edge.token)||{};
     const amount=meta.decimals==null?edge.amountRaw+" raw units":formatTokenAmount(edge.amountRaw,meta.decimals);
     selected=null;
-    inspector.innerHTML='<span class="sl-kicker">TRANSFER INSPECTOR</span><strong>'+esc(meta.symbol||edge.transferType||"Observed transfer")+'</strong><div class="sl-kv">From<b>'+esc(edge.from)+'</b></div><div class="sl-kv">To<b>'+esc(edge.to)+'</b></div><div class="sl-kv">Observed amount<b>'+esc(amount)+'</b></div><div class="sl-kv">Token contract<b>'+esc(edge.token)+'</b></div><div class="sl-kv">Block / log index<b>'+esc(parseInt(edge.blockNumber,16).toLocaleString())+' / '+esc(parseInt(edge.logIndex,16).toString())+'</b></div><div class="sl-kv">Transaction hash<b>'+esc(edge.transactionHash)+'</b></div><a href="'+esc(getNetwork().explorer)+'/tx/'+esc(edge.transactionHash)+'" target="_blank" rel="noopener noreferrer">Open transaction in explorer ↗</a>';
+    inspector.innerHTML='<span class="sl-kicker">TRANSFER INSPECTOR</span><strong>'+esc(meta.symbol||edge.transferType||"Observed transfer")+'</strong><div class="sl-kv">From<b>'+esc(edge.from)+'</b></div><div class="sl-kv">To<b>'+esc(edge.to)+'</b></div><div class="sl-kv">Observed amount<b>'+esc(amount)+'</b></div><div class="sl-kv">Token contract<b>'+esc(edge.token)+'</b></div><div class="sl-kv">Block / log index<b>'+esc(parseInt(edge.blockNumber,16).toLocaleString())+' / '+esc(parseInt(edge.logIndex,16).toString())+'</b></div><div class="sl-kv">Transaction hash<b>'+esc(edge.transactionHash)+'</b></div><a href="'+esc(current.explorer)+'/tx/'+esc(edge.transactionHash)+'" target="_blank" rel="noopener noreferrer">Open transaction in explorer ↗</a>';
     canvas.querySelectorAll(".sl-node").forEach(el=>el.classList.remove("is-selected"));
     canvas.querySelectorAll(".sl-edge").forEach((el,i)=>el.classList.toggle("is-selected",i===index));
   };
@@ -312,7 +320,7 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
   form.addEventListener("submit",async event=>{
     event.preventDefault();const address=normalizeAddress(form.elements.address.value.trim());
     if(!address){status.textContent="Enter a valid 20-byte EVM address.";status.classList.add("sl-error");return;}
-    const network=getNetwork(),source=form.elements.source.value;
+    const network=getNetwork(),source=form.elements.source.value,pinnedRpc=bindNetworkRpc(rpc,network);
     status.classList.remove("sl-error");form.querySelector("button").disabled=true;form.querySelector("button").textContent="Tracing…";
     canvas.innerHTML='<div class="sl-empty">Querying '+(source==="indexed"?"indexed address history":"live RPC Transfer logs")+'…</div>';ledger.replaceChildren();stats.replaceChildren();
     try{
@@ -349,16 +357,16 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
         render(graph);
         status.textContent="Ethereum Mainnet · Blockscout indexed history · "+history.itemCount.toLocaleString()+" ERC-20 records · "+history.pagesFetched+" pages · "+(history.complete?"provider pagination complete":"partial history; page cap reached")+(history.malformedItems?" · "+history.malformedItems+" malformed records skipped":"")+" · "+new Date().toISOString();
       }else{
-        const chainId=await rpc("eth_chainId",[]);
+        const chainId=await pinnedRpc("eth_chainId",[]);
         if(chainId.toLowerCase()!==network.chainId.toLowerCase())throw new Error("RPC chain ID mismatch; no graph data accepted.");
-        const latestHex=await rpc("eth_blockNumber",[]),latest=BigInt(latestHex),requested=Number(form.elements.window.value);
+        const latestHex=await pinnedRpc("eth_blockNumber",[]),latest=BigInt(latestHex),requested=Number(form.elements.window.value);
         let windowBlocks=requested,logs=[],lastError=null;
         for(let attempt=0;attempt<4;attempt++){
           const from=latest>BigInt(windowBlocks)?latest-BigInt(windowBlocks):0n,fromHex="0x"+from.toString(16);
           try{
             const [sent,received]=await Promise.all([
-              rpc("eth_getLogs",[{fromBlock:fromHex,toBlock:latestHex,topics:[ERC20_TRANSFER_TOPIC,addressTopic(address)]}]),
-              rpc("eth_getLogs",[{fromBlock:fromHex,toBlock:latestHex,topics:[ERC20_TRANSFER_TOPIC,null,addressTopic(address)]}])
+              pinnedRpc("eth_getLogs",[{fromBlock:fromHex,toBlock:latestHex,topics:[ERC20_TRANSFER_TOPIC,addressTopic(address)]}]),
+              pinnedRpc("eth_getLogs",[{fromBlock:fromHex,toBlock:latestHex,topics:[ERC20_TRANSFER_TOPIC,null,addressTopic(address)]}])
             ]);
             logs=[...(sent||[]),...(received||[])];lastError=null;break;
           }catch(error){lastError=error;if(attempt===3||windowBlocks<=64)break;windowBlocks=Math.max(64,Math.floor(windowBlocks/2));}
@@ -374,8 +382,8 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
           const peers = allPeers.slice(0,8);
           const expanded = await Promise.allSettled(peers.map(async peer => {
             const [sent,received] = await Promise.all([
-              rpc("eth_getLogs",[{fromBlock:"0x"+from.toString(16),toBlock:latestHex,topics:[ERC20_TRANSFER_TOPIC,addressTopic(peer)]}]),
-              rpc("eth_getLogs",[{fromBlock:"0x"+from.toString(16),toBlock:latestHex,topics:[ERC20_TRANSFER_TOPIC,null,addressTopic(peer)]}])
+              pinnedRpc("eth_getLogs",[{fromBlock:"0x"+from.toString(16),toBlock:latestHex,topics:[ERC20_TRANSFER_TOPIC,addressTopic(peer)]}]),
+              pinnedRpc("eth_getLogs",[{fromBlock:"0x"+from.toString(16),toBlock:latestHex,topics:[ERC20_TRANSFER_TOPIC,null,addressTopic(peer)]}])
             ]);
             return [...(sent||[]),...(received||[])];
           }));
@@ -387,7 +395,9 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
         const transfers=decodeTransferLogs(allLogs,{chainId:network.chainId});
         graph=buildLiveTransferGraph(transfers,{address,chainId:network.chainId,scannedFrom:from.toString(),scannedTo:latest.toString(),hops:requestedHops,maxEdges:160,maxNodes:40});
         graph.provider="Selected public RPC endpoint";
-        tokenMetadata = await fetchMetadataBatch(graph.edges.map(edge => edge.token), rpc);
+        graph.explorer=network.explorer;
+        graph.networkName=network.name;
+        tokenMetadata = await fetchMetadataBatch(graph.edges.map(edge => edge.token), pinnedRpc);
         render(graph);
         status.textContent=network.name+" · "+requestedHops+" hop(s) · scanned "+windowBlocks.toLocaleString()+" blocks"+(requestedHops===2?" · expanded "+expandedAddresses+"/"+Math.min(expansionCandidates,8)+" counterparties"+(expansionCandidates>8?" (8-counterparty cap)":""):"")+(expansionFailures?" · "+expansionFailures+" expansion queries failed":"")+(graph.truncated?" · graph reached its node/edge cap":"")+" · "+new Date().toISOString();
       }
