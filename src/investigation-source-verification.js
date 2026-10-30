@@ -21,10 +21,11 @@ async function rpc(fetchImpl,url,method,params,id){
  return payload.result;
 }
 function checkTimelineEntry(item,tx,receipt){
- const problems=[];
- if(item.blockNumber!==null&&item.blockNumber!==undefined&&!equalQuantity(item.blockNumber,tx.blockNumber))problems.push("timeline-block-does-not-match-transaction");
+ const problems=[];let checksPerformed=0;
+ if(item.blockNumber!==null&&item.blockNumber!==undefined){checksPerformed++;if(!equalQuantity(item.blockNumber,tx.blockNumber))problems.push("timeline-block-does-not-match-transaction");}
  if(item.logIndex!==null&&item.logIndex!==undefined){
   const log=(Array.isArray(receipt.logs)?receipt.logs:[]).find(candidate=>equalQuantity(candidate.logIndex,item.logIndex));
+  checksPerformed++;
   if(!log)problems.push("log-index-not-found-in-transaction-receipt");
   else{
    const expected=item.record?.evidence;
@@ -32,20 +33,20 @@ function checkTimelineEntry(item,tx,receipt){
     const decoded=decodeTransfer(log);
     if(!decoded)problems.push("receipt-log-is-not-a-decodable-erc20-transfer");
     else{
-     if(expected?.token&&lower(expected.token)!==decoded.token)problems.push("token-contract-does-not-match-receipt-log");
-     if(item.record?.from&&lower(item.record.from)!==decoded.from)problems.push("transfer-sender-does-not-match-receipt-log");
-     if(item.record?.to&&lower(item.record.to)!==decoded.to)problems.push("transfer-recipient-does-not-match-receipt-log");
-     if(expected?.amountRaw!==undefined&&String(expected.amountRaw)!==decoded.amountRaw)problems.push("transfer-amount-does-not-match-receipt-log");
+     if(expected?.token){checksPerformed++;if(lower(expected.token)!==decoded.token)problems.push("token-contract-does-not-match-receipt-log");}
+     if(item.record?.from){checksPerformed++;if(lower(item.record.from)!==decoded.from)problems.push("transfer-sender-does-not-match-receipt-log");}
+     if(item.record?.to){checksPerformed++;if(lower(item.record.to)!==decoded.to)problems.push("transfer-recipient-does-not-match-receipt-log");}
+     if(expected?.amountRaw!==undefined){checksPerformed++;if(String(expected.amountRaw)!==decoded.amountRaw)problems.push("transfer-amount-does-not-match-receipt-log");}
     }
    }
   }
  }
  if(item.kind==="observed-transaction-flow"||item.record?.edgeType==="observed-transaction-flow"){
-  if(item.record?.from&&lower(item.record.from)!==lower(tx.from))problems.push("transaction-sender-does-not-match-observed-flow");
-  if(item.record?.to&&lower(item.record.to)!==lower(tx.to))problems.push("transaction-recipient-does-not-match-observed-flow");
+  if(item.record?.from){checksPerformed++;if(lower(item.record.from)!==lower(tx.from))problems.push("transaction-sender-does-not-match-observed-flow");}
+  if(item.record?.to){checksPerformed++;if(lower(item.record.to)!==lower(tx.to))problems.push("transaction-recipient-does-not-match-observed-flow");}
  }
  return {kind:item.kind,transactionHash:lower(item.transactionHash),blockNumber:item.blockNumber??null,logIndex:item.logIndex??null,
-  status:problems.length?"mismatch":"matched",problems};
+  status:problems.length?"mismatch":checksPerformed?"matched":"not-checkable",checksPerformed,problems};
 }
 /**
  * Verify dossier transaction references against one configured read-only JSON-RPC endpoint.
@@ -91,7 +92,7 @@ export async function verifyInvestigationDossierSources(dossier,{fetchImpl=globa
   coverage:{uniqueTransactionReferences:hashes.length,checkedTransactions:selected.length,notChecked:Math.max(0,hashes.length-selected.length),truncated:hashes.length>selected.length},
   summary:{confirmedTransactions:count("confirmed"),pendingTransactions:count("pending"),notFoundTransactions:count("not-found"),
    receiptUnavailableTransactions:count("receipt-unavailable"),inconsistentTransactions:count("inconsistent"),rpcErrors:count("rpc-error"),
-   matchedEvidenceChecks:evidenceChecks.filter(item=>item.status==="matched").length,evidenceMismatches:evidenceChecks.filter(item=>item.status==="mismatch").length},
+   matchedEvidenceChecks:evidenceChecks.filter(item=>item.status==="matched").length,evidenceMismatches:evidenceChecks.filter(item=>item.status==="mismatch").length,notCheckableEvidenceChecks:evidenceChecks.filter(item=>item.status==="not-checkable").length},
   results,limitations:[
    "Verification queried one configured public RPC endpoint and records its point-in-time response; no independent provider quorum or consensus proof is performed.",
    "A transaction and receipt returned by the endpoint do not authenticate the identity or intent of any address, nor prove a token contract is legitimate.",
