@@ -294,7 +294,9 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
   const fundDepth=panel.querySelector('[data-role="fund-depth"]');
   const fundResults=panel.querySelector('[data-role="fund-results"]');
   locateNode.addEventListener("click",()=>{if(!current)return;const query=nodeSearch.value.trim().toLowerCase();if(!query){nodeSearch.focus();return;}const matches=current.nodes.filter(node=>node.address.toLowerCase().includes(query));if(matches.length===1){showNode(matches[0].address);const element=[...canvas.querySelectorAll(".sl-node")].find(item=>item.dataset.address===matches[0].address);element?.scrollIntoView({block:"nearest",inline:"nearest"});nodeSearch.setCustomValidity("");}else if(matches.length>1){nodeSearch.setCustomValidity("Multiple matches. Enter more address characters.");nodeSearch.reportValidity();}else{nodeSearch.setCustomValidity("No matching address in this graph.");nodeSearch.reportValidity();}});
-  nodeSearch.addEventListener("input",()=>nodeSearch.setCustomValidity(""));\n  nodeSearch.addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();locateNode.click();}});\n  flowFilter.addEventListener("change",()=>{if(activeNode)renderNodeLedger(activeNode);});
+  nodeSearch.addEventListener("input",()=>nodeSearch.setCustomValidity(""));
+  nodeSearch.addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();locateNode.click();}});
+  flowFilter.addEventListener("change",()=>{if(activeNode)renderNodeLedger(activeNode);});
   assetFilter.addEventListener("change",()=>{if(activeNode)renderNodeLedger(activeNode);});
   panel.querySelector('[data-role="export-evidence"]').addEventListener("click",()=>{
     if(!current)return;
