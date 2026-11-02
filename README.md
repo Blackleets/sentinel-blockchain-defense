@@ -143,3 +143,15 @@ The Live Visualizer includes an evidence workspace after a successful trace:
 - **Evidence export:** downloads a JSON bundle containing the query origin, chain ID, provider/coverage metadata, scanned block range, graph bounds, limitations, nodes, observed edges and available token metadata.
 
 Exports represent the records loaded for that specific trace, not a complete chain history or an independent attestation. They preserve source coverage and truncation flags so downstream reviewers can interpret the evidence correctly. The timeline is capped at 50 displayed events; the export includes the full in-memory graph evidence returned by the selected bounded query.
+
+
+### Live investigation signals
+
+The live visualizer derives two bounded classes of review prompts from the exact edges already loaded into the current graph:
+
+- **Topology concentration:** fan-in and fan-out patterns grouped by chain ID and token contract, with distinct counterparties, edge indexes and transaction-hash references.
+- **Block-window activity concentration:** incoming or outgoing observations grouped by subject and token, requiring a configured minimum number of events and distinct transactions inside a bounded block-number window.
+
+These signals are structural observations, not risk scores, attribution, laundering indicators or findings of malicious intent. Block distance is not elapsed time. The block-window detector does not infer velocity or automation. Patterns may reflect ordinary exchange, treasury, payment, router, batching or contract activity. Missing patterns in a bounded snapshot do not establish absence elsewhere on-chain.
+
+The evidence JSON export includes the derived signal bundle alongside the underlying loaded nodes and edges so reviewers can inspect the references and reproduce the configured detection logic.
