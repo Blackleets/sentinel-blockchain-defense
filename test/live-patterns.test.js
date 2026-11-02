@@ -41,3 +41,17 @@ test("does not infer a burst from repeated logs in one transaction or distant bl
 test("validates block burst configuration",()=>{
  assert.throws(()=>deriveBlockWindowBursts([],{blockWindow:0}),/blockWindow/);
 });
+
+test("finds separate bursts without reusing evidence between windows",()=>{
+ const records=[
+  edge(a,b,1,{blockNumber:"0x10"}),edge(a,c,2,{blockNumber:"0x11"}),
+  edge(a,d,3,{blockNumber:"0x12"}),edge(a,e,4,{blockNumber:"0x13"}),
+  edge(a,b,5,{blockNumber:"0x100"}),edge(a,c,6,{blockNumber:"0x101"}),
+  edge(a,d,7,{blockNumber:"0x102"}),edge(a,e,8,{blockNumber:"0x103"})
+ ];
+ const result=deriveBlockWindowBursts(records,{blockWindow:10});
+ const outgoing=result.signals.filter(signal=>signal.direction==="outgoing");
+ assert.equal(outgoing.length,2);
+ assert.deepEqual(outgoing.map(signal=>signal.edgeCount),[4,4]);
+ assert.equal(new Set(outgoing.flatMap(signal=>signal.edgeIndexes)).size,8);
+});
