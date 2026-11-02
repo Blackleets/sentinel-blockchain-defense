@@ -85,23 +85,26 @@ export function deriveBlockWindowBursts(edges,{blockWindow=20,minEvents=4,minTra
  const signals=[];
  for(const group of groups.values()){
   const records=group.records.sort((a,b)=>a.block<b.block?-1:a.block>b.block?1:a.index-b.index);
-  let lastEnd=-1;
-  for(let start=0;start<records.length;start++){
+  let start=0;
+  while(start<records.length){
    let end=start;
    while(end+1<records.length&&records[end+1].block-records[start].block<=BigInt(blockWindow))end++;
-   if(end-start+1<minEvents)continue;
    const slice=records.slice(start,end+1),hashes=[...new Set(slice.map(item=>item.transactionHash))];
-   if(hashes.length<minTransactions||end<=lastEnd)continue;
-   signals.push({id:"block-burst:"+group.chainId+":"+group.token+":"+group.subject+":"+group.direction+":"+records[start].block.toString(),
-    pattern:"block-window-burst",label:group.direction==="outgoing"?"Outgoing activity concentration":"Incoming activity concentration",
-    chainId:group.chainId,token:group.token,subject:group.subject,direction:group.direction,
-    blockFrom:"0x"+records[start].block.toString(16),blockTo:"0x"+records[end].block.toString(16),
-    blockSpan:(records[end].block-records[start].block).toString(),blockWindow,
-    edgeCount:slice.length,transactionCount:hashes.length,edgeIndexes:slice.map(item=>item.index).sort((a,b)=>a-b),
-    transactionHashes:hashes,
-    interpretation:"Observed event concentration inside a configured block window. Block distance is not elapsed time; this does not establish automation, coordination, ownership or malicious intent."
-   });
-   lastEnd=end;
+   if(slice.length>=minEvents&&hashes.length>=minTransactions){
+    signals.push({id:"block-burst:"+group.chainId+":"+group.token+":"+group.subject+":"+group.direction+":"+records[start].block.toString(),
+     pattern:"block-window-burst",label:group.direction==="outgoing"?"Outgoing activity concentration":"Incoming activity concentration",
+     chainId:group.chainId,token:group.token,subject:group.subject,direction:group.direction,
+     blockFrom:"0x"+records[start].block.toString(16),blockTo:"0x"+records[end].block.toString(16),
+     blockSpan:(records[end].block-records[start].block).toString(),blockWindow,
+     edgeCount:slice.length,transactionCount:hashes.length,edgeIndexes:slice.map(item=>item.index).sort((a,b)=>a-b),
+     transactionHashes:hashes,
+     interpretation:"Observed event concentration inside a configured block window. Block distance is not elapsed time; this does not establish automation, coordination, ownership or malicious intent."
+    });
+    // Emit disjoint windows so one event cannot inflate multiple burst signals.
+    start=end+1;
+   }else{
+    start++;
+   }
   }
  }
  const ordered=signals.sort((a,b)=>b.transactionCount-a.transactionCount||b.edgeCount-a.edgeCount||a.subject.localeCompare(b.subject));
