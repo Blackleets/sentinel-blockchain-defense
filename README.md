@@ -57,6 +57,16 @@ SENTINEL is an evidence-led, read-only multichain EVM security research workspac
 
 Because the application uses native JavaScript modules, serve the repository over HTTP rather than opening the file directly. With Node.js 20+, run `npx serve .` from the repository folder and open the local URL it prints. The inspector uses public RPC endpoints configured in `src/chains.js`: Cloudflare Ethereum, BNB public dataseed and Polygon public RPC. These community/public endpoints may rate-limit, change policy or be unavailable; browser access also depends on CORS. The app fails closed when the returned chain ID does not match the selected network.
 
+## Live Visualizer (bounded RPC evidence)
+
+- Trace an arbitrary EVM address against the currently selected Ethereum, BNB Smart Chain or Polygon public RPC endpoint.
+- Query a user-selected recent block window for indexed ERC-20 `Transfer(address,address,uint256)` event logs where the address is sender or recipient.
+- Expand the graph to one or two hops. Two-hop mode queries up to eight first-hop counterparties and caps the graph at 40 nodes / 160 edges.
+- Render a directional address-centred relationship graph, selectable node inspector and node-focused transaction evidence ledger. Every displayed edge links to its transaction in the selected chain explorer.
+- Read token `symbol`, `name` and `decimals` through bounded read-only calls; format quantities with integer arithmetic and retain raw values in evidence.
+- The trace verifies the RPC chain ID before accepting results, deduplicates transaction/log pairs, caps graph edges and automatically retries smaller block windows when a provider rejects a range.
+- The graph is explicitly limited to Transfer-shaped logs returned by one provider. It does not include native transfers, internal calls, full wallet history, cross-chain hops, token legitimacy, ownership attribution or a risk verdict. A zero-result scan is not evidence of inactivity.
+
 ## Security model
 
 - Read-only public RPC calls only.
@@ -86,3 +96,62 @@ Evidence before verdict. Explicit source and freshness. Simulations labelled as 
 ## License
 
 No license has been granted yet. All rights reserved by default until a license is added.
+
+## Indexed address history (Ethereum Mainnet)
+
+- The Live Visualizer now offers an optional **Indexed history · Ethereum** source backed by the public Blockscout REST API v2 at `eth.blockscout.com`.
+- It reads paginated ERC-20 transfer records in both directions for the queried address, follows the provider's `next_page_params` cursor, deduplicates transaction/log pairs, and preserves raw integer amounts and provider-supplied token metadata.
+- Each query is capped at 8 pages per direction (up to the provider's page size); the UI reports whether pagination completed or hit the cap. Provider records are indexed observations, not independently attested facts.
+- This indexed source is currently enabled only for Ethereum Mainnet. BNB Smart Chain and Polygon continue to use the bounded public-RPC path until a network-specific indexed endpoint is validated. The indexed path is one-hop only.
+- This does **not** mean complete chain history: it covers the provider's indexed ERC-20 transfer records only. Native transfers, internal calls, arbitrary logs, NFTs, cross-chain activity and unindexed records are excluded. Public endpoint availability, CORS and rate limits may affect results.
+- Blockscout API reference: https://github.com/blockscout/blockscout-api-v2-swagger
+
+
+## Indexed Ethereum value-flow activity
+
+The Visualizer adds an **Indexed activity · ETH + internal · Ethereum** source alongside the ERC-20-only indexed history mode. It combines:
+- Provider-indexed ERC-20 transfer records.
+- Top-level transactions carrying non-zero native ETH value.
+- Successful internal transaction traces carrying non-zero native ETH value.
+
+Each record retains its transaction hash, block, direction, raw integer amount, record type and provider origin. Pagination is capped independently by endpoint and direction (8 pages per direction for ERC-20 history; 4 pages per direction for top-level and internal transactions). The UI reports whether all provider cursors were exhausted or a cap was reached.
+
+Important interpretation limits:
+- This remains a provider-indexed Ethereum-only view, not guaranteed complete chain history.
+- Zero-value contract interactions are not represented as value-flow edges.
+- Internal traces are execution-level subcalls and may coexist with their parent transaction; **do not sum internal traces as independent wallet balance changes**.
+- Failed internal traces are excluded from value-flow edges.
+- Token metadata and provider labels are not proof of ownership, legitimacy or risk.
+
+
+## Fund Tracer — candidate route reconstruction
+
+- Reconstructs bounded, directed candidate paths from supplied on-chain value-flow observations through the Live Visualizer's destination-address Fund Tracer panel.
+- Enforces same-chain and same-asset continuity, chronological block/log ordering, non-increasing raw amount compatibility, cycle rejection and a maximum depth of three hops.
+- Caps output at 20 candidate paths and reports truncation and explored-edge counts.
+- Every hop retains the source transaction hash, block, log index, raw amount, timestamp when available and transfer type.
+- Internal execution traces are excluded from candidate paths to avoid treating parent transactions and subcalls as independent balance movements.
+- Exact or partial amount compatibility is a heuristic only. It does not prove that the same units of an asset moved between addresses; balances may be pooled, replenished or commingled.
+- No path found means only that no candidate path was found in the supplied bounded records. It is not evidence of inactivity.
+
+## Investigation workspace controls
+
+The Live Visualizer includes an evidence workspace after a successful trace:
+- **Flow filter:** restricts the selected node's transfer ledger to incoming or outgoing records.
+- **Asset filter:** restricts that ledger to one observed token/asset contract. Filters do not mutate the underlying evidence set or alter the graph.
+- **Timeline:** displays up to the latest 50 observed records in descending block/log order. Selecting an event opens its transfer inspector.
+- **Evidence export:** downloads a JSON bundle containing the query origin, chain ID, provider/coverage metadata, scanned block range, graph bounds, limitations, nodes, observed edges and available token metadata.
+
+Exports represent the records loaded for that specific trace, not a complete chain history or an independent attestation. They preserve source coverage and truncation flags so downstream reviewers can interpret the evidence correctly. The timeline is capped at 50 displayed events; the export includes the full in-memory graph evidence returned by the selected bounded query.
+
+
+### Live investigation signals
+
+The live visualizer derives two bounded classes of review prompts from the exact edges already loaded into the current graph:
+
+- **Topology concentration:** fan-in and fan-out patterns grouped by chain ID and token contract, with distinct counterparties, edge indexes and transaction-hash references.
+- **Block-window activity concentration:** incoming or outgoing observations grouped by subject and token, requiring a configured minimum number of events and distinct transactions inside a bounded block-number window.
+
+These signals are structural observations, not risk scores, attribution, laundering indicators or findings of malicious intent. Block distance is not elapsed time. The block-window detector does not infer velocity or automation. Patterns may reflect ordinary exchange, treasury, payment, router, batching or contract activity. Missing patterns in a bounded snapshot do not establish absence elsewhere on-chain.
+
+The evidence JSON export includes the derived signal bundle alongside the underlying loaded nodes and edges so reviewers can inspect the references and reproduce the configured detection logic.
