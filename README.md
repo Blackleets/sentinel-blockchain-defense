@@ -155,3 +155,8 @@ The live visualizer derives two bounded classes of review prompts from the exact
 These signals are structural observations, not risk scores, attribution, laundering indicators or findings of malicious intent. Block distance is not elapsed time. The block-window detector does not infer velocity or automation. Patterns may reflect ordinary exchange, treasury, payment, router, batching or contract activity. Missing patterns in a bounded snapshot do not establish absence elsewhere on-chain.
 
 The evidence JSON export includes the derived signal bundle alongside the underlying loaded nodes and edges so reviewers can inspect the references and reproduce the configured detection logic.
+
+
+## Product direction and contributor workflow
+
+The approved hybrid Command Center direction and acceptance criteria are documented in [Product Direction & Command Center Brief](docs/PRODUCT_DIRECTION_COMMAND_CENTER.md). Product and engineering changes should follow the repository skill at [.agents/skills/sentinel-product-engineering-director/SKILL.md](.agents/skills/sentinel-product-engineering-director/SKILL.md): evidence-first semantics, truthful coverage, responsive UX, preservation of existing behavior, and verified delivery.
