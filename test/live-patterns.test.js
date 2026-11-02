@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {deriveLivePatterns} from "../src/live-patterns.js";
+import {deriveLivePatterns,deriveBlockWindowBursts} from "../src/live-patterns.js";
 const a="0x"+"1".repeat(40),b="0x"+"2".repeat(40),c="0x"+"3".repeat(40),d="0x"+"4".repeat(40),e="0x"+"5".repeat(40);
 const token="0x"+"a".repeat(40),hash=n=>"0x"+String(n).repeat(64);
 const edge=(from,to,n,overrides={})=>({chainId:"0x1",token,from,to,transactionHash:hash(n),...overrides});
@@ -24,4 +24,20 @@ test("reports bounded output and rejects invalid options",()=>{
  assert.equal(result.signals.length,1);assert.equal(result.truncated,true);
  assert.throws(()=>deriveLivePatterns([],{origin:"bad"}),/valid EVM/);
  assert.throws(()=>deriveLivePatterns([],{minCounterparties:1}),/minCounterparties/);
+});
+
+test("detects block-window concentration across distinct transactions",()=>{
+ const burst=deriveBlockWindowBursts([edge(a,b,1,{blockNumber:"0x10"}),edge(a,c,2,{blockNumber:"0x11"}),edge(a,d,3,{blockNumber:"0x12"}),edge(a,e,4,{blockNumber:"0x13"})]);
+ assert.equal(burst.signalCount,1);assert.equal(burst.signals[0].pattern,"block-window-burst");
+ assert.equal(burst.signals[0].transactionCount,4);assert.equal(burst.signals[0].direction,"outgoing");
+ assert.match(burst.signals[0].interpretation,/does not establish/);
+});
+test("does not infer a burst from repeated logs in one transaction or distant blocks",()=>{
+ const oneTx=[edge(a,b,1,{blockNumber:"0x10"}),edge(a,c,1,{blockNumber:"0x10"}),edge(a,d,1,{blockNumber:"0x11"}),edge(a,e,1,{blockNumber:"0x12"})];
+ assert.equal(deriveBlockWindowBursts(oneTx).signalCount,0);
+ const distant=[edge(a,b,1,{blockNumber:"0x10"}),edge(a,c,2,{blockNumber:"0x40"}),edge(a,d,3,{blockNumber:"0x80"}),edge(a,e,4,{blockNumber:"0xc0"})];
+ assert.equal(deriveBlockWindowBursts(distant,{blockWindow:10}).signalCount,0);
+});
+test("validates block burst configuration",()=>{
+ assert.throws(()=>deriveBlockWindowBursts([],{blockWindow:0}),/blockWindow/);
 });
