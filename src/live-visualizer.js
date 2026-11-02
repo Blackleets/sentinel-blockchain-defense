@@ -1,6 +1,6 @@
 import { fetchBlockscoutAddressTransfers, fetchBlockscoutAddressActivity, BLOCKSCOUT_ENDPOINTS } from "./blockscout-provider.js";
 import { traceFundPaths } from "./fund-tracer.js";
-import { deriveLivePatterns } from "./live-patterns.js";
+import { deriveLivePatterns, deriveBlockWindowBursts } from "./live-patterns.js";
 export function bindNetworkRpc(rpc, network) {
   if (typeof rpc !== "function") throw new TypeError("A JSON-RPC function is required");
   if (!network || typeof network.chainId !== "string" || typeof network.rpc !== "string" || typeof network.explorer !== "string") {
@@ -264,10 +264,13 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
       ['BLOCK WINDOW',graph.scannedFrom+' → '+graph.scannedTo]
     ].map(([label,value])=>'<span class="sl-stat"><b>'+esc(value)+'</b>'+esc(label)+'</span>').join('');
     const patternReport=deriveLivePatterns(graph.edges,{origin:graph.origin});
+    const burstReport=deriveBlockWindowBursts(graph.edges);
     const patternResults=panel.querySelector('[data-role="pattern-results"]');
-    patternResults.innerHTML=patternReport.signals.map(signal=>'<article class="sl-pattern-card"><strong>'+esc(signal.label)+' · '+signal.counterpartyCount+' counterparties</strong><small>'+esc(short(signal.subject))+' · '+esc(short(signal.token))+' · '+signal.edgeCount+' observed edge(s)</small><small>'+signal.transactionHashes.length+' transaction reference(s) · '+esc(signal.pattern)+'</small></article>').join('')||'<div class="sl-empty-state">No configured fan-in or fan-out pattern found in this evidence snapshot.</div>';
-    panel.querySelector('[data-role="pattern-note"]').textContent='Topology prompts only — not risk scores, ownership attribution or proof of intent. '+patternReport.limitations[0];
-    graph.topologyIntelligence=patternReport;
+    const patternCards=patternReport.signals.map(signal=>'<article class="sl-pattern-card"><strong>'+esc(signal.label)+' · '+signal.counterpartyCount+' counterparties</strong><small>'+esc(short(signal.subject))+' · '+esc(short(signal.token))+' · '+signal.edgeCount+' observed edge(s)</small><small>'+signal.transactionHashes.length+' transaction reference(s) · '+esc(signal.pattern)+'</small></article>');
+    const burstCards=burstReport.signals.map(signal=>'<article class="sl-pattern-card"><strong>'+esc(signal.label)+' · '+signal.transactionCount+' transactions</strong><small>'+esc(short(signal.subject))+' · '+esc(short(signal.token))+' · blocks '+esc(parseInt(signal.blockFrom,16).toLocaleString())+'–'+esc(parseInt(signal.blockTo,16).toLocaleString())+'</small><small>'+signal.edgeCount+' edges in '+signal.blockWindow+' blocks · block distance is not elapsed time</small></article>');
+    patternResults.innerHTML=[...patternCards,...burstCards].join('')||'<div class="sl-empty-state">No configured topology or block-window concentration pattern found in this evidence snapshot.</div>';
+    panel.querySelector('[data-role="pattern-note"]').textContent='Topology and block-window prompts only — not risk scores, ownership attribution or proof of intent. Block distance is not elapsed time. '+patternReport.limitations[0];
+    graph.topologyIntelligence={schema:"sentinel.live-investigation-signals.v1",topology:patternReport,blockWindowBursts:burstReport};
     investigationTools.hidden=false;
     const assets=[...new Set(graph.edges.map(edge=>edge.token))];
     assetFilter.innerHTML='<option value="all">All assets ('+assets.length+')</option>'+assets.map(token=>{const meta=tokenMetadata.get(token)||{};return '<option value="'+esc(token)+'">'+esc(meta.symbol||short(token))+'</option>';}).join('');
@@ -307,7 +310,7 @@ export function mountLiveVisualizer(container, { rpc, getNetwork }) {
   assetFilter.addEventListener("change",()=>{if(activeNode)renderNodeLedger(activeNode);});
   panel.querySelector('[data-role="export-evidence"]').addEventListener("click",()=>{
     if(!current)return;
-    const bundle={schema:"sentinel.evidence-export.v1",exportedAt:new Date().toISOString(),chainId:current.chainId,origin:current.origin,coverage:current.coverage,provider:current.provider||null,scannedFrom:current.scannedFrom,scannedTo:current.scannedTo,hops:current.hops,nodeCount:current.nodeCount,edgeCount:current.edgeCount,totalObservedEdges:current.totalObservedEdges,truncated:Boolean(current.truncated),limitations:current.limitations||[],topologyIntelligence:current.topologyIntelligence||null,nodes:current.nodes,edges:current.edges.map(edge=>({...edge,tokenMetadata:tokenMetadata.get(edge.token)||null}))};
+    const bundle={schema:"sentinel.evidence-export.v1",exportedAt:new Date().toISOString(),chainId:current.chainId,origin:current.origin,coverage:current.coverage,provider:current.provider||null,scannedFrom:current.scannedFrom,scannedTo:current.scannedTo,hops:current.hops,nodeCount:current.nodeCount,edgeCount:current.edgeCount,totalObservedEdges:current.totalObservedEdges,truncated:Boolean(current.truncated),limitations:current.limitations||[],investigationSignals:current.topologyIntelligence||null,nodes:current.nodes,edges:current.edges.map(edge=>({...edge,tokenMetadata:tokenMetadata.get(edge.token)||null}))};
     const blob=new Blob([JSON.stringify(bundle,null,2)],{type:"application/json"});
     const url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download="sentinel-evidence-"+current.chainId+"-"+current.origin.slice(2,10)+".json";document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
   });
